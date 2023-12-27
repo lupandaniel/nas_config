@@ -4,33 +4,43 @@ services:
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
     network_mode: host
+    deploy:
+      resources:
+        limits:
+          cpus: '0.70'
+          memory: 1000M
+    logging:
+      driver: json-file
+      options:
+        max-file: '3'
+        max-size: 10m
+    restart: always
     environment:
       - PUID=1000
       - PGID=1000
       - VERSION=docker
-      - PLEX_CLAIM=${ENV_PLEX_CLAIM}
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
-      - ENV_SECONDARY_PATH=${ENV_SECONDARY_PATH}
+      - PLEX_CLAIM=${PLEX_CLAIM}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+      - SECONDARY_PARTITION=${SECONDARY_PARTITION}
     volumes:
-      - ${ENV_PRIMARY_PATH}/plex/library:/config
-      - ${ENV_SECONDARY_PATH}/plex/tvseries:/tv
-      - ${ENV_SECONDARY_PATH}/plex/movies:/movies
-      - ${ENV_SECONDARY_PATH}/plex/doc:/documentaries
-    restart: always
+      - ${PRIMARY_PARTITION}/plex/library:/config
+      - ${SECONDARY_PARTITION}/plex/tvseries:/tv
+      - ${SECONDARY_PARTITION}/plex/movies:/movies
+      - ${SECONDARY_PARTITION}/plex/doc:/documentaries
 
   homeassistant:
     image: homeassistant/home-assistant:latest
     container_name: hass
     privileged: true
     volumes:
-      - ${ENV_PRIMARY_PATH}/hass:/config
+      - ${PRIMARY_PARTITION}/hass:/config
       - /dev/serial/by-id/:/dev/serial/by-id
     devices:
       - /dev/ttyACM0
     environment:
       - TZ=Europe/Athens
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
-      - ENV_SECONDARY_PATH=${ENV_SECONDARY_PATH}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+      - SECONDARY_PARTITION=${SECONDARY_PARTITION}
     network_mode: host
     restart: always
 
@@ -42,18 +52,18 @@ services:
       - PGID=1000
       - TZ=Europe/Athens
       - WEBUI_PORT=8080
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
-      - ENV_SECONDARY_PATH=${ENV_SECONDARY_PATH}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+      - SECONDARY_PARTITION=${SECONDARY_PARTITION}
     ports:
       - 8080:8080
       - 6881:6881
       - 6881:6881/udp
     volumes:
-      - ${ENV_PRIMARY_PATH}/qbt:/config
-      - ${ENV_SECONDARY_PATH}/downloads:/downloads
-      - ${ENV_SECONDARY_PATH}/plex/tvseries:/tvseries
-      - ${ENV_SECONDARY_PATH}/plex/movies:/movies
-      - ${ENV_SECONDARY_PATH}/plex/doc:/doc
+      - ${PRIMARY_PARTITION}/qbt:/config
+      - ${SECONDARY_PARTITION}/downloads:/downloads
+      - ${SECONDARY_PARTITION}/plex/tvseries:/tvseries
+      - ${SECONDARY_PARTITION}/plex/movies:/movies
+      - ${SECONDARY_PARTITION}/plex/doc:/doc
     restart: always
     networks:
       - my-network
@@ -70,11 +80,11 @@ services:
       - PHOTOPRISM_UPLOAD_NSFW=true
       - PHOTOPRISM_ADMIN_PASSWORD=${PHOTOPRISM_ADMIN_PASSWORD}
       - PHOTOPRISM_SITE_URL=http://localhost:2342/photoprism/
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
-      - ENV_SECONDARY_PATH=${ENV_SECONDARY_PATH}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+      - SECONDARY_PARTITION=${SECONDARY_PARTITION}
     volumes:
-      - ${ENV_PRIMARY_PATH}/photoprism:/photoprism/storage
-      - ${ENV_PRIMARY_PATH}/photoprism_raw:/photoprism/originals
+      - ${PRIMARY_PARTITION}/photoprism:/photoprism/storage
+      - ${PRIMARY_PARTITION}/photoprism_raw:/photoprism/originals
 
   nginx:
     image: jc21/nginx-proxy-manager:latest
@@ -82,24 +92,24 @@ services:
     restart: always
     network_mode: host
     environment:
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
-      - ENV_SECONDARY_PATH=${ENV_SECONDARY_PATH}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+      - SECONDARY_PARTITION=${SECONDARY_PARTITION}
     volumes:
-      - ${ENV_PRIMARY_PATH}/nginx/data:/data
-      - ${ENV_PRIMARY_PATH}/nginx/letsencrypt:/etc/letsencrypt
+      - ${PRIMARY_PARTITION}/nginx/data:/data
+      - ${PRIMARY_PARTITION}/nginx/letsencrypt:/etc/letsencrypt
 
   mariadb:
     image: mariadb:10.10
     restart: always
     container_name: mariadb
     environment:
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
       - MYSQL_RANDOM_ROOT_PASSWORD=true
       - MYSQL_DATABASE=passbolt
       - MYSQL_USER=passbolt
       - MYSQL_PASSWORD=${MARIADB_PASSWORD}
     volumes:
-      - ${ENV_PRIMARY_PATH}/passbolt/mysql:/var/lib/mysql
+      - ${PRIMARY_PARTITION}/passbolt/mysql:/var/lib/mysql
     networks:
       - my-network
 
@@ -110,19 +120,19 @@ services:
     depends_on:
       - mariadb
     environment:
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
-      - ENV_SMTP_PASSWORD=${ENV_SMTP_PASSWORD}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
       - APP_BASE=/passbolt
       - APP_FULL_BASE_URL=https://${DOMAIN}
       - EMAIL_DEFAULT_FROM_NAME=lupan
-      - EMAIL_DEFAULT_FROM=${ENV_EMAIL}
+      - EMAIL_DEFAULT_FROM=${EMAIL}
       - EMAIL_TRANSPORT_DEFAULT_HOST=smtp.gmail.com
       - EMAIL_TRANSPORT_DEFAULT_PORT=587
-      - EMAIL_TRANSPORT_DEFAULT_USERNAME=${ENV_EMAIL}
-      - EMAIL_TRANSPORT_DEFAULT_PASSWORD=${ENV_SMTP_PASSWORD}
+      - EMAIL_TRANSPORT_DEFAULT_USERNAME=${EMAIL}
+      - EMAIL_TRANSPORT_DEFAULT_PASSWORD=${SMTP_PASSWORD}
       - EMAIL_TRANSPORT_DEFAULT_TLS=true
       - PASSBOLT_KEY_NAME=lupan
-      - PASSBOLT_KEY_EMAIL=${ENV_EMAIL}
+      - PASSBOLT_KEY_EMAIL=${EMAIL}
       - DATASOURCES_DEFAULT_HOST=mariadb
       - DATASOURCES_DEFAULT_USERNAME=passbolt
       - DATASOURCES_DEFAULT_PASSWORD=${MARIADB_PASSWORD}
@@ -130,8 +140,8 @@ services:
       - SECURITY_SALT=lupansecretsalt
       - PASSBOLT_SSL_FORCE=true
     volumes:
-      - ${ENV_PRIMARY_PATH}/passbolt/gpg_volume:/etc/passbolt/gpg
-      - ${ENV_PRIMARY_PATH}/passbolt/jwt_volume:/etc/passbolt/jwt
+      - ${PRIMARY_PARTITION}/passbolt/gpg_volume:/etc/passbolt/gpg
+      - ${PRIMARY_PARTITION}/passbolt/jwt_volume:/etc/passbolt/jwt
     command: ["/usr/bin/wait-for.sh", "-t", "0", "mariadb:3306", "--", "/docker-entrypoint.sh"]
     ports:
       - 8081:80
@@ -143,9 +153,9 @@ services:
     image: kylemanna/openvpn
     container_name: openvpn
     volumes:
-      - ${ENV_PRIMARY_PATH}/openvpn:/etc/openvpn
+      - ${PRIMARY_PARTITION}/openvpn:/etc/openvpn
     environment:
-      - OVPN_DATA=${ENV_PRIMARY_PATH}/openvpn
+      - OVPN_DATA=${PRIMARY_PARTITION}/openvpn
     ports:
       - 1194:1194/udp
     cap_add:
@@ -160,20 +170,20 @@ services:
     restart: always
     network_mode: host
     environment:
-      - ENV_EMAIL=${ENV_EMAIL}
-      - ENV_SMTP_PASSWORD=${ENV_SMTP_PASSWORD}
-      - ENV_PRIMARY_PATH=${ENV_PRIMARY_PATH}
+      - EMAIL=${EMAIL}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
       - GENERIC_TIMEZONE=Europe/Bucharest
       - TZ=Europe/Bucharest
       - N8N_SMTP_HOST=smtp.gmail.com
       - N8N_SMTP_PORT=587
-      - N8N_SMTP_USER=${ENV_EMAIL}
-      - N8N_SMTP_PASS=${ENV_SMTP_PASSWORD}
-      - N8N_SMTP_SENDER="N8N ${ENV_EMAIL}"
+      - N8N_SMTP_USER=${EMAIL}
+      - N8N_SMTP_PASS=${SMTP_PASSWORD}
+      - N8N_SMTP_SENDER="N8N ${EMAIL}"
       - N8N_PROTOCOL=http
       - NODE_ENV=production
     volumes:
-      - ${ENV_PRIMARY_PATH}/n8n:/home/node/.n8n
+      - ${PRIMARY_PARTITION}/n8n:/home/node/.n8n
 
   rclone:
     image: rclone/rclone
@@ -183,7 +193,7 @@ services:
     ports:
       - "5572:5572"
     volumes:
-      - ${ENV_PRIMARY_PATH}/rclone:/config/rclone
+      - ${PRIMARY_PARTITION}/rclone:/config/rclone
       - /root/gcs:/data:shared
     command: rcd --rc-web-gui --rc-addr :5572 --rc-no-auth
 

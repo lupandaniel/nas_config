@@ -1,3 +1,0 @@
-sudo apt-get install openssh-server
-service immediately ##
-sudo systemctl enable ssh --now

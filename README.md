@@ -61,11 +61,11 @@ The `docker-compose.yml` file contains configuration settings for each service, 
 
    This setup utilizes a `.env` file for managing environment variables, making it easier to configure and maintain the Docker Compose services. The `.env.example` file contains placeholders for various environment variables, which should be defined with appropriate values. Here's an overview of some key variables:
    
-   - `ENV_PLEX_CLAIM`: A unique claim token used for Plex Media Server to associate your server with your account.
-   - `ENV_PRIMARY_PATH`: The primary path for storing persistent data used by services, such as media files for Plex.
-   - `ENV_SECONDARY_PATH`: A secondary path for storing additional data, like backups or other media files.
-   - `ENV_EMAIL`: Your email address, used for notifications or account setups for certain services.
-   - `ENV_SMTP_PASSWORD`: The password for your SMTP server, used for sending email notifications.
+   - `PLEX_CLAIM`: A unique claim token used for Plex Media Server to associate your server with your account.
+   - `PRIMARY_PARTITION`: The primary path for storing persistent data used by services, such as media files for Plex.
+   - `SECONDARY_PARTITION`: A secondary path for storing additional data, like backups or other media files.
+   - `EMAIL`: Your email address, used for notifications or account setups for certain services.
+   - `SMTP_PASSWORD`: The password for your SMTP server, used for sending email notifications.
    - `MARIADB_PASSWORD`: The password for the MariaDB database service.
    - `DOMAIN`: The domain name for accessing your services externally.
    - `PHOTOPRISM_ADMIN_PASSWORD`: The admin password for Photoprism, a photo management service.
@@ -102,7 +102,7 @@ The `docker-compose.yml` file contains configuration settings for each service, 
 ```bash
 docker-compose exec passbolt su -m -c "/usr/share/php/passbolt/bin/cake \
                                  passbolt register_user \
-                                 -u ${ENV_EMAIL} \
+                                 -u ${EMAIL} \
                                  -f ${NAME} \
                                  -l ${SURNAME} \
                                  -r admin" -s /bin/sh www-data
@@ -128,8 +128,8 @@ docker run -v $OVPN_DATA:/etc/openvpn --rm kylemanna/openvpn ovpn_getclient ${DO
 - Configure rclone
 ```bash
 docker run -it \
-    -v ${ENV_PRIMARY_PATH}/rclone:/config/rclone \
-    -v ${ENV_PRIMARY_PATH}/gcs:/data:gcs \
+    -v ${PRIMARY_PARTITION}/rclone:/config/rclone \
+    -v ${PRIMARY_PARTITION}/gcs:/data:gcs \
     --net=host \
     --user $(id -u):$(id -g) \
     --privileged \
