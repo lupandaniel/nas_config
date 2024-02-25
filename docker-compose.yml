@@ -115,7 +115,7 @@ services:
       - MYSQL_USER=passbolt
       - MYSQL_PASSWORD=${MARIADB_PASSWORD}
     volumes:
-      - ${PRIMARY_PARTITION}/passbolt/mysql:/var/lib/mysql
+      - ${PRIMARY_PARTITION}/mysql:/var/lib/mysql
     networks:
       - my-network
 
