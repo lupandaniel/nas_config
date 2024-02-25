@@ -82,7 +82,7 @@ services:
       - PHOTOPRISM_SITE_URL=http://localhost:2342/photoprism/
       - PRIMARY_PARTITION=${PRIMARY_PARTITION}
       - SECONDARY_PARTITION=${SECONDARY_PARTITION}
-      - PHOTOPRISM_DATABASE_DSN=photoprism:${PHOTOPRISM_MYSQL_PASSWORD}@tcp(mariadb:3306)/photoprism?charset=utf8mb4,utf8&parseTime=true
+      - PHOTOPRISM_DATABASE_DSN=photoprism:${PHOTOPRISM_MYSQL_PASSWORD}@tcp(${MYSQL_DB_HOST}:3306)/photoprism?charset=utf8mb4,utf8&parseTime=true
       - PHOTOPRISM_DATABASE_DRIVER=mysql
     volumes:
       - ${PRIMARY_PARTITION}/photoprism:/photoprism/storage
