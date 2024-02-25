@@ -24,9 +24,9 @@ services:
       - SECONDARY_PARTITION=${SECONDARY_PARTITION}
     volumes:
       - ${PRIMARY_PARTITION}/plex/library:/config
-      - ${SECONDARY_PARTITION}/plex/tvseries:/tv
-      - ${SECONDARY_PARTITION}/plex/movies:/movies
-      - ${SECONDARY_PARTITION}/plex/doc:/documentaries
+      - ${SECONDARY_PARTITION}/plex_data/tvseries:/tv
+      - ${SECONDARY_PARTITION}/plex_data/movies:/movies
+      - ${SECONDARY_PARTITION}/plex_data/doc:/documentaries
 
   homeassistant:
     image: homeassistant/home-assistant:latest
