@@ -82,6 +82,10 @@ services:
       - PHOTOPRISM_SITE_URL=http://localhost:2342/photoprism/
       - PRIMARY_PARTITION=${PRIMARY_PARTITION}
       - SECONDARY_PARTITION=${SECONDARY_PARTITION}
+      - PHOTOPRISM_DATABASE_DRIVER=mysql
+      - PHOTOPRISM_DATABASE_SERVER="mariadb:3306"
+      - PHOTOPRISM_DATABASE_USER=passbolt
+      - PHOTOPRISM_DATABASE_PASSWORD=${MARIADB_PASSWORD}
     volumes:
       - ${PRIMARY_PARTITION}/photoprism:/photoprism/storage
       - ${PRIMARY_PARTITION}/photoprism_raw:/photoprism/originals
