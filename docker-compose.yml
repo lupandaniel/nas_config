@@ -106,6 +106,8 @@ services:
     image: mariadb:10.10
     restart: always
     container_name: mariadb
+    ports:
+      - 3306:3306
     environment:
       - PRIMARY_PARTITION=${PRIMARY_PARTITION}
       - MYSQL_RANDOM_ROOT_PASSWORD=true
