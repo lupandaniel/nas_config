@@ -61,9 +61,9 @@ services:
     volumes:
       - ${PRIMARY_PARTITION}/qbt:/config
       - ${SECONDARY_PARTITION}/downloads:/downloads
-      - ${SECONDARY_PARTITION}/plex/tvseries:/tvseries
-      - ${SECONDARY_PARTITION}/plex/movies:/movies
-      - ${SECONDARY_PARTITION}/plex/doc:/doc
+      - ${SECONDARY_PARTITION}/plex_data/tvseries:/tvseries
+      - ${SECONDARY_PARTITION}/plex_data/movies:/movies
+      - ${SECONDARY_PARTITION}/plex_data/doc:/doc
     restart: always
     networks:
       - my-network
