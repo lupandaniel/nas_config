@@ -24,7 +24,7 @@ services:
       - SECONDARY_PARTITION=${SECONDARY_PARTITION}
     volumes:
       - ${PRIMARY_PARTITION}/plex/library:/config
-      - ${SECONDARY_PARTITION}/plex_data/tvseries:/tv
+      - ${SECONDARY_PARTITION}/plex_data/tv:/tv
       - ${SECONDARY_PARTITION}/plex_data/movies:/movies
       - ${SECONDARY_PARTITION}/plex_data/doc:/documentaries
 
@@ -61,7 +61,7 @@ services:
     volumes:
       - ${PRIMARY_PARTITION}/qbt:/config
       - ${SECONDARY_PARTITION}/downloads:/downloads
-      - ${SECONDARY_PARTITION}/plex_data/tvseries:/tvseries
+      - ${SECONDARY_PARTITION}/plex_data/tv:/tv
       - ${SECONDARY_PARTITION}/plex_data/movies:/movies
       - ${SECONDARY_PARTITION}/plex_data/doc:/doc
     restart: always
