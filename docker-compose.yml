@@ -118,41 +118,41 @@ services:
     networks:
       - my-network
 
-  passbolt:
-    image: passbolt/passbolt:4.0.0-2-ce
-    restart: always
-    container_name: passbolt
-    depends_on:
-      - mariadb
-    environment:
-      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - APP_BASE=/passbolt
-      - APP_FULL_BASE_URL=https://${DOMAIN}
-      - EMAIL_DEFAULT_FROM_NAME=lupan
-      - EMAIL_DEFAULT_FROM=${EMAIL}
-      - EMAIL_TRANSPORT_DEFAULT_HOST=smtp.gmail.com
-      - EMAIL_TRANSPORT_DEFAULT_PORT=587
-      - EMAIL_TRANSPORT_DEFAULT_USERNAME=${EMAIL}
-      - EMAIL_TRANSPORT_DEFAULT_PASSWORD=${SMTP_PASSWORD}
-      - EMAIL_TRANSPORT_DEFAULT_TLS=true
-      - PASSBOLT_KEY_NAME=lupan
-      - PASSBOLT_KEY_EMAIL=${EMAIL}
-      - DATASOURCES_DEFAULT_HOST=mariadb
-      - DATASOURCES_DEFAULT_USERNAME=passbolt
-      - DATASOURCES_DEFAULT_PASSWORD=${MARIADB_PASSWORD}
-      - DATASOURCES_DEFAULT_DATABASE=passbolt
-      - SECURITY_SALT=lupansecretsalt
-      - PASSBOLT_SSL_FORCE=true
-    volumes:
-      - ${PRIMARY_PARTITION}/passbolt/gpg_volume:/etc/passbolt/gpg
-      - ${PRIMARY_PARTITION}/passbolt/jwt_volume:/etc/passbolt/jwt
-    command: ["/usr/bin/wait-for.sh", "-t", "0", "mariadb:3306", "--", "/docker-entrypoint.sh"]
-    ports:
-      - 8081:80
-      - 4443:443
-    networks:
-      - my-network
+#  passbolt:
+#    image: passbolt/passbolt:4.0.0-2-ce
+#    restart: always
+#    container_name: passbolt
+#    depends_on:
+#      - mariadb
+#    environment:
+#      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+#      - SMTP_PASSWORD=${SMTP_PASSWORD}
+#      - APP_BASE=/passbolt
+#      - APP_FULL_BASE_URL=https://${DOMAIN}
+#      - EMAIL_DEFAULT_FROM_NAME=lupan
+#      - EMAIL_DEFAULT_FROM=${EMAIL}
+#      - EMAIL_TRANSPORT_DEFAULT_HOST=smtp.gmail.com
+#      - EMAIL_TRANSPORT_DEFAULT_PORT=587
+#      - EMAIL_TRANSPORT_DEFAULT_USERNAME=${EMAIL}
+#      - EMAIL_TRANSPORT_DEFAULT_PASSWORD=${SMTP_PASSWORD}
+#      - EMAIL_TRANSPORT_DEFAULT_TLS=true
+#      - PASSBOLT_KEY_NAME=lupan
+#      - PASSBOLT_KEY_EMAIL=${EMAIL}
+#      - DATASOURCES_DEFAULT_HOST=mariadb
+#      - DATASOURCES_DEFAULT_USERNAME=passbolt
+#      - DATASOURCES_DEFAULT_PASSWORD=${MARIADB_PASSWORD}
+#      - DATASOURCES_DEFAULT_DATABASE=passbolt
+#      - SECURITY_SALT=lupansecretsalt
+#      - PASSBOLT_SSL_FORCE=true
+#    volumes:
+#      - ${PRIMARY_PARTITION}/passbolt/gpg_volume:/etc/passbolt/gpg
+#      - ${PRIMARY_PARTITION}/passbolt/jwt_volume:/etc/passbolt/jwt
+#    command: ["/usr/bin/wait-for.sh", "-t", "0", "mariadb:3306", "--", "/docker-entrypoint.sh"]
+#    ports:
+#      - 8081:80
+#      - 4443:443
+#    networks:
+#      - my-network
 
   openvpn:
     image: kylemanna/openvpn
@@ -169,38 +169,54 @@ services:
     networks:
       - my-network
 
-  n8n:
-    image: docker.n8n.io/n8nio/n8n:1.0.0-rc
-    container_name: n8n
-    restart: always
-    network_mode: host
-    environment:
-      - EMAIL=${EMAIL}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
-      - GENERIC_TIMEZONE=Europe/Bucharest
-      - TZ=Europe/Bucharest
-      - N8N_SMTP_HOST=smtp.gmail.com
-      - N8N_SMTP_PORT=587
-      - N8N_SMTP_USER=${EMAIL}
-      - N8N_SMTP_PASS=${SMTP_PASSWORD}
-      - N8N_SMTP_SENDER="N8N ${EMAIL}"
-      - N8N_PROTOCOL=http
-      - NODE_ENV=production
-    volumes:
-      - ${PRIMARY_PARTITION}/n8n:/home/node/.n8n
+#  n8n:
+#    image: docker.n8n.io/n8nio/n8n:1.0.0-rc
+#    container_name: n8n
+#    restart: always
+#    network_mode: host
+#    environment:
+#      - EMAIL=${EMAIL}
+#      - SMTP_PASSWORD=${SMTP_PASSWORD}
+#      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+#      - GENERIC_TIMEZONE=Europe/Bucharest
+#      - TZ=Europe/Bucharest
+#      - N8N_SMTP_HOST=smtp.gmail.com
+#      - N8N_SMTP_PORT=587
+#      - N8N_SMTP_USER=${EMAIL}
+#      - N8N_SMTP_PASS=${SMTP_PASSWORD}
+#      - N8N_SMTP_SENDER="N8N ${EMAIL}"
+#      - N8N_PROTOCOL=http
+#      - NODE_ENV=production
+#    volumes:
+#      - ${PRIMARY_PARTITION}/n8n:/home/node/.n8n
 
-  rclone:
-    image: rclone/rclone
-    container_name: rclone
-    restart: always
-    privileged: true
-    ports:
-      - "5572:5572"
+#  rclone:
+#    image: rclone/rclone
+#    container_name: rclone
+#    restart: always
+#    privileged: true
+#    ports:
+#      - "5572:5572"
+#    volumes:
+#      - ${PRIMARY_PARTITION}/rclone:/config/rclone
+#      - /root/gcs:/data:shared
+#    command: rcd --rc-web-gui --rc-addr :5572 --rc-no-auth
+
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:latest
+    container_name: duplicati
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - CLI_ARGS=
+      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
     volumes:
-      - ${PRIMARY_PARTITION}/rclone:/config/rclone
-      - /root/gcs:/data:shared
-    command: rcd --rc-web-gui --rc-addr :5572 --rc-no-auth
+      - ${PRIMARY_PARTITION}/duplicati/config:/config
+      - ${PRIMARY_PARTITION}:/source
+    ports:
+      - 8200:8200
+    restart: unless-stopped
 
 networks:
   my-network:
