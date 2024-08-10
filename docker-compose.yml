@@ -4,11 +4,11 @@ services:
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
     network_mode: host
-    deploy:
-      resources:
-        limits:
-          cpus: '0.70'
-          memory: 1000M
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.70'
+#          memory: 1000M
     logging:
       driver: json-file
       options:
