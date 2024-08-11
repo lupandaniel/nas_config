@@ -213,13 +213,5 @@ services:
       - 8200:8200
     restart: unless-stopped
 
-volumes:
-  plex_data:
-    driver: local
-    driver_opts:
-      type: cifs
-      device: "//${SMB_ADDR}/plex_data"
-      o: "addr=${SMB_ADDR},username=plex,password=${CIFS_PWD},rw,uid=1000,gid=1000,vers=3.0,file_mode=0777,dir_mode=0777"
-
 networks:
   my-network:
