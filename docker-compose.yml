@@ -158,6 +158,8 @@ services:
       - OVPN_DATA=${PRIMARY_PARTITION}/openvpn
     ports:
       - 1194:1194/udp
+    devices:
+      - /dev/net/tun
     cap_add:
       - NET_ADMIN
     restart: always
