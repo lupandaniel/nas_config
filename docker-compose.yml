@@ -207,7 +207,9 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
       - CLI_ARGS=
+      - SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}
       - PRIMARY_PARTITION=${PRIMARY_PARTITION}
+      - DUPLICATI__WEBSERVICE_PASSWORD=${DUPLICATI_PASSWORD}
     volumes:
       - ${PRIMARY_PARTITION}/duplicati/config:/config
       - ${PRIMARY_PARTITION}:/source
