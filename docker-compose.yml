@@ -22,6 +22,7 @@ services:
       - ${SECONDARY_PARTITION}/plex_data/tv:/tv
       - ${SECONDARY_PARTITION}/plex_data/movies:/movies
       - ${SECONDARY_PARTITION}/plex_data/doc:/documentaries
+      - ${SECONDARY_PARTITION}/plex_data/cameras:/cameras
 
   homeassistant:
     image: homeassistant/home-assistant:latest
