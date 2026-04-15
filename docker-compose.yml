@@ -154,7 +154,8 @@ services:
     image: kylemanna/openvpn
     container_name: openvpn
     volumes:
-      - ${PRIMARY_PARTITION}/openvpn:/etc/openvpn
+#      - ${PRIMARY_PARTITION}/openvpn:/etc/openvpn
+      - ovpn-data-nas:/etc/openvpn
     environment:
       - OVPN_DATA=${PRIMARY_PARTITION}/openvpn
     ports:
@@ -279,5 +280,6 @@ services:
 networks:
   my-network:
 
-#volumes:
-#  model-cache:
+volumes:
+  ovpn-data-nas:
+    external: true
