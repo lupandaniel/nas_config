@@ -1,447 +1,530 @@
 # Home Server Setup
 
-This Docker Compose configuration provides a comprehensive home server setup with various services for media streaming, home automation, file downloading, photo management, web hosting, database management, backup solutions, VPN access, and more.
+Docker Compose stack for media streaming, downloads, photo management, home automation, reverse proxy, backups, and VPN access. All services are defined in [`docker-compose.yml`](docker-compose.yml).
+
+## Application ports
+
+Replace `HOST` with your server IP or hostname.
+
+**Host network** (`plex`, `hass`, `nginx`): ports bind on the machine directly — nothing is listed under `ports:` in compose; defaults below are what each app uses.
+
+**Published ports** (everything else): `host:container` mappings from compose.
+
+### Active services
+
+| App | Port | Protocol | Mapping | Purpose |
+|-----|------|----------|---------|---------|
+| Plex | 32400 | TCP | host | Web UI / API |
+| Plex | 32469 | UDP | host | DLNA (if enabled in Plex) |
+| Plex | 32443 | TCP | host | HTTPS (if enabled in Plex) |
+| Home Assistant | 8123 | TCP | host | Web UI |
+| Nginx Proxy Manager | 80 | TCP | host | HTTP (proxied sites) |
+| Nginx Proxy Manager | 443 | TCP | host | HTTPS (proxied sites) |
+| Nginx Proxy Manager | 81 | TCP | host | Admin UI |
+| qBittorrent | 8080 | TCP | `8080:8080` | Web UI |
+| qBittorrent | 6881 | TCP | `6881:6881` | BitTorrent peers |
+| qBittorrent | 6881 | UDP | `6881:6881` | BitTorrent peers |
+| PhotoPrism | 2342 | TCP | `2342:2342` | Web UI |
+| MariaDB | 3306 | TCP | `3306:3306` | MySQL/MariaDB |
+| OpenVPN | 1194 | UDP | `1194:1194` | VPN tunnel |
+| Duplicati | 8200 | TCP | `8200:8200` | Web UI |
+| Radarr | 7878 | TCP | `7878:7878` | Web UI |
+| Sonarr | 8989 | TCP | `8989:8989` | Web UI |
+| Seerr | 5055 | TCP | `5055:5055` | Web UI |
+
+### Quick access URLs (active)
+
+| App | URL |
+|-----|-----|
+| Plex | `http://HOST:32400/web` |
+| Home Assistant | `http://HOST:8123` |
+| Nginx Proxy Manager | `http://HOST:81` |
+| qBittorrent | `http://HOST:8080` |
+| PhotoPrism | `http://HOST:2342/photoprism/` |
+| MariaDB | `HOST:3306` |
+| Duplicati | `http://HOST:8200` |
+| Radarr | `http://HOST:7878` |
+| Sonarr | `http://HOST:8989` |
+| Seerr | `http://HOST:5055` |
+| OpenVPN | UDP `HOST:1194` (client `.ovpn` file) |
+
+### Optional services (commented out in compose)
+
+| App | Port | Protocol | Mapping | Purpose |
+|-----|------|----------|---------|---------|
+| Passbolt | 8081 | TCP | `8081:80` | HTTP web UI |
+| Passbolt | 4443 | TCP | `4443:443` | HTTPS web UI |
+| n8n | 5678 | TCP | host | Web UI (default; not set in compose) |
+| rclone | 5572 | TCP | `5572:5572` | Remote control web UI |
+| Immich | 2283 | TCP | `2283:2283` | Web UI / API |
+| Cloudflare Tunnel | — | — | — | Outbound only; no inbound host ports |
+
+---
 
 ## Overview
 
-This setup uses Docker Compose to orchestrate multiple containerized services, providing a self-hosted alternative to cloud services. The configuration has been optimized to remove redundancies and improve maintainability.
+- **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps) and `SECONDARY_PARTITION` (media and downloads). Set both in `.env`.
+- **Networks**:
+  - **`host`**: Plex, Home Assistant, Nginx Proxy Manager — use the host’s ports directly.
+  - **`my-network`**: qBittorrent, PhotoPrism, MariaDB, OpenVPN — can resolve each other by container name (e.g. `mariadb:3306`).
+  - **Default project bridge**: Duplicati, Radarr, Sonarr, Seerr — published ports only; not on `my-network`.
+- **Restart**: Most services use `restart: always`; Duplicati, Radarr, Sonarr, and Seerr use `restart: unless-stopped`.
 
-### Architecture Highlights
+---
 
-- **Network Configuration**: Services use either `host` network mode (for services requiring direct host network access) or a custom bridge network (`my-network`) for inter-service communication
-- **Volume Management**: Persistent data is stored using bind mounts to paths defined by `PRIMARY_PARTITION` and `SECONDARY_PARTITION` environment variables
-- **Restart Policies**: Most services use `restart: always` to ensure automatic recovery, with `duplicati` using `restart: unless-stopped` for more controlled behavior
-
-## Active Services
+## Active services
 
 ### Plex Media Server
 
-[Plex](https://www.plex.tv/) is a media server for organizing and streaming media content to various devices.
+**Image:** `lscr.io/linuxserver/plex:latest`  
+**Purpose:** Organize and stream TV, movies, documentaries, and camera footage.
 
-**Configuration:**
-- **Network**: Host mode (direct access to host network)
-- **Ports**: Uses host networking (default port 32400)
-- **Volumes**:
-  - Configuration: `${PRIMARY_PARTITION}/plex/library`
-  - Media libraries: TV shows, movies, documentaries, and camera footage from `${SECONDARY_PARTITION}/plex_data/`
-- **Environment Variables**:
-  - `PUID=1000` / `PGID=1000`: User/group IDs for file permissions
-  - `PLEX_CLAIM`: Required token to claim your server (get from [plex.tv/claim](https://www.plex.tv/claim))
-- **Logging**: JSON file driver with rotation (max 3 files, 10MB each)
+| Item | Value |
+|------|--------|
+| Network | `host` |
+| Ports | **32400** (web/API; standard Plex port on host) |
+| Config | `${PRIMARY_PARTITION}/plex/library` → `/config` |
+| Libraries | `${SECONDARY_PARTITION}/plex_data/tv` → `/tv` |
+| | `${SECONDARY_PARTITION}/plex_data/movies` → `/movies` |
+| | `${SECONDARY_PARTITION}/plex_data/doc` → `/documentaries` |
+| | `${SECONDARY_PARTITION}/plex_data/cameras` → `/cameras` |
+
+**Environment:** `PUID=1000`, `PGID=1000`, `VERSION=docker`, `PLEX_CLAIM` (from [plex.tv/claim](https://www.plex.tv/claim)), plus partition vars passed through.
+
+**Access:** `http://HOST:32400/web` or Plex apps after claiming the server.
+
+**Notes:** Log rotation — JSON driver, max 3 files × 10 MB.
+
+---
 
 ### Home Assistant
 
-[Home Assistant](https://www.home-assistant.io/) is an open-source platform for smart home automation, allowing you to control and automate IoT devices.
+**Image:** `homeassistant/home-assistant:latest`  
+**Purpose:** Smart home automation and device control.
 
-**Configuration:**
-- **Network**: Host mode (required for device discovery)
-- **Privileged Mode**: Enabled (required for hardware access)
-- **Volumes**:
-  - Configuration: `${PRIMARY_PARTITION}/hass`
-  - Serial devices: `/dev/serial/by-id/` (for Z-Wave, Zigbee, etc.)
-- **Devices**: Direct access to `/dev/ttyACM0` (USB serial devices)
-- **Timezone**: Europe/Athens
+| Item | Value |
+|------|--------|
+| Network | `host` |
+| Ports | **8123** (default UI on host) |
+| Config | `${PRIMARY_PARTITION}/hass` → `/config` |
+| Serial | `/dev/serial/by-id/` mounted for USB adapters (Z-Wave, Zigbee, etc.) |
+| Device | `/dev/ttyACM0` |
+
+**Environment:** `TZ=Europe/Athens`
+
+**Access:** `http://HOST:8123`
+
+**Notes:** Runs **privileged** for hardware access. Adjust `devices` if your USB serial path differs.
+
+---
 
 ### qBittorrent
 
-[qBittorrent](https://www.qbittorrent.org/) is a BitTorrent client with a web-based interface for downloading and managing torrents.
+**Image:** `lscr.io/linuxserver/qbittorrent:latest`  
+**Purpose:** BitTorrent client with web UI; downloads feed Plex libraries and *arr apps.
 
-**Configuration:**
-- **Network**: Custom bridge network (`my-network`)
-- **Ports**:
-  - `8080`: Web UI
-  - `6881/tcp` and `6881/udp`: BitTorrent protocol (peer connections)
-- **Volumes**:
-  - Configuration: `${PRIMARY_PARTITION}/qbt`
-  - Downloads: `${SECONDARY_PARTITION}/downloads`
-  - Media folders: Shared with Plex (TV, movies, documentaries)
-- **Environment Variables**:
-  - `PUID=1000` / `PGID=1000`: File ownership
-  - `TZ=Europe/Athens`: Timezone
-  - `WEBUI_PORT=8080`: Web interface port
+| Item | Value |
+|------|--------|
+| Network | `my-network` |
+| Ports | **8080** (web UI), **6881/tcp** and **6881/udp** (BitTorrent) |
+| Config | `${PRIMARY_PARTITION}/qbt` → `/config` |
+| Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads` |
+| Media | Same TV/movies/doc paths as Plex (`/tv`, `/movies`, `/doc`) |
+
+**Environment:** `PUID=1000`, `PGID=1000`, `TZ=Europe/Athens`, `WEBUI_PORT=8080`
+
+**Access:** `http://HOST:8080` — change default credentials (`admin` / `adminadmin`) on first login.
+
+---
 
 ### PhotoPrism
 
-[PhotoPrism](https://photoprism.org/) is an AI-powered photo management application that automatically organizes and tags your photos.
+**Image:** `photoprism/photoprism`  
+**Purpose:** AI-assisted photo library; metadata stored in MariaDB.
 
-**Configuration:**
-- **Network**: Custom bridge network (`my-network`)
-- **Port**: `2342` (web interface)
-- **Database**: Connects to MariaDB for metadata storage
-- **Volumes**:
-  - Storage: `${PRIMARY_PARTITION}/photoprism`
-  - Originals: `${PRIMARY_PARTITION}/photoprism_raw`
-- **Environment Variables**:
-  - `PHOTOPRISM_ADMIN_PASSWORD`: Admin account password
-  - `PHOTOPRISM_DATABASE_DSN`: MySQL connection string
-  - `PHOTOPRISM_UPLOAD_NSFW=true`: Allows NSFW content uploads
+| Item | Value |
+|------|--------|
+| Network | `my-network` (DB host must be reachable, typically `mariadb`) |
+| Ports | **2342** → container `2342` |
+| Storage | `${PRIMARY_PARTITION}/photoprism` → `/photoprism/storage` |
+| Originals | `${PRIMARY_PARTITION}/photoprism_raw` → `/photoprism/originals` |
+
+**Environment:**
+
+- `PHOTOPRISM_ADMIN_PASSWORD` — admin login
+- `PHOTOPRISM_MYSQL_PASSWORD` — DB user password (in DSN)
+- `MYSQL_DB_HOST` — e.g. `mariadb`
+- `PHOTOPRISM_DATABASE_DRIVER=mysql`
+- `PHOTOPRISM_DATABASE_DSN=photoprism:…@tcp(mariadb:3306)/photoprism?…`
+- `PHOTOPRISM_SITE_URL=http://localhost:2342/photoprism/` (adjust if using a reverse proxy)
+- `PHOTOPRISM_UPLOAD_NSFW=true`
+
+**Access:** `http://HOST:2342/photoprism/`
+
+---
 
 ### Nginx Proxy Manager
 
-[Nginx Proxy Manager](https://nginxproxymanager.com/) provides a web-based interface for managing Nginx reverse proxy configurations, including SSL certificate management via Let's Encrypt.
+**Image:** `jc21/nginx-proxy-manager:latest`  
+**Purpose:** Reverse proxy, host-based routing, and Let’s Encrypt SSL from a web UI.
 
-**Configuration:**
-- **Network**: Host mode (required for SSL termination and port management)
-- **Volumes**:
-  - Data: `${PRIMARY_PARTITION}/nginx/data`
-  - SSL Certificates: `${PRIMARY_PARTITION}/nginx/letsencrypt`
+| Item | Value |
+|------|--------|
+| Network | `host` |
+| Ports | **80** (HTTP), **443** (HTTPS), **81** (admin UI) |
+| Data | `${PRIMARY_PARTITION}/nginx/data` → `/data` |
+| Certificates | `${PRIMARY_PARTITION}/nginx/letsencrypt` → `/etc/letsencrypt` |
+
+**Access:** `http://HOST:81` — default login `admin@example.com` / `changeme` (change immediately).
+
+**Notes:** Point public DNS at this host and create proxy hosts in the UI for services you want on HTTPS (e.g. PhotoPrism, Seerr).
+
+---
 
 ### MariaDB
 
-[MariaDB](https://mariadb.org/) is a relational database server, currently used by PhotoPrism for metadata storage.
+**Image:** `mariadb:10.10`  
+**Purpose:** Database for PhotoPrism (and prepared `passbolt` DB/user if Passbolt is enabled later).
 
-**Configuration:**
-- **Network**: Custom bridge network (`my-network`)
-- **Port**: `3306` (MySQL/MariaDB standard port)
-- **Volumes**: Database files stored in `${PRIMARY_PARTITION}/mysql`
-- **Environment Variables**:
-  - `MARIADB_ROOT_PASSWORD`: Root user password
-  - `MARIADB_PASSWORD`: Password for the `passbolt` user
-  - `MYSQL_DATABASE=passbolt`: Database name (prepared for Passbolt if enabled)
-  - `MYSQL_USER=passbolt`: Database user
+| Item | Value |
+|------|--------|
+| Network | `my-network` |
+| Ports | **3306** → `3306` |
+| Data | `${PRIMARY_PARTITION}/mysql` → `/var/lib/mysql` |
+
+**Environment:**
+
+- `MARIADB_ROOT_PASSWORD`
+- `MARIADB_PASSWORD` — password for user `passbolt`
+- `MYSQL_DATABASE=passbolt`, `MYSQL_USER=passbolt`
+- `MARIADB_INITDB_SKIP_TZINFO=1`
+
+**Access:** From other containers on `my-network`: `mariadb:3306`. From host/LAN: `HOST:3306` (restrict with firewall).
+
+**Notes:** Create the PhotoPrism database/user separately if not already in your init scripts; DSN in compose expects database `photoprism` and user `photoprism`.
+
+---
 
 ### OpenVPN
 
-[OpenVPN](https://openvpn.net/) provides a VPN server for secure remote access to your home network.
+**Image:** `kylemanna/openvpn`  
+**Purpose:** Remote access to the home network.
 
-**Configuration:**
-- **Network**: Custom bridge network (`my-network`)
-- **Port**: `1194/udp` (OpenVPN standard port)
-- **Volumes**: Configuration and certificates in `${PRIMARY_PARTITION}/openvpn`
-- **Capabilities**: `NET_ADMIN` (required for network configuration)
-- **Devices**: `/dev/net/tun` (TUN/TAP interface)
+| Item | Value |
+|------|--------|
+| Network | `my-network` |
+| Ports | **1194/udp** |
+| Volume | Named volume `ovpn-data-nas` (external) → `/etc/openvpn` |
+| Capabilities | `NET_ADMIN` |
+| Device | `/dev/net/tun` |
+
+**Environment:** `OVPN_DATA` references `${PRIMARY_PARTITION}/openvpn` for setup scripts; runtime config uses the Docker volume `ovpn-data-nas`.
+
+**Access:** Clients use generated `.ovpn` profiles (see [OpenVPN setup](#openvpn-setup) below).
+
+---
 
 ### Duplicati
 
-[Duplicati](https://www.duplicati.com/) is a backup solution that supports encrypted, incremental backups to various storage backends (cloud storage, network shares, etc.).
+**Image:** `lscr.io/linuxserver/duplicati:latest`  
+**Purpose:** Encrypted incremental backups to cloud or remote targets.
 
-**Configuration:**
-- **Network**: Default bridge network
-- **Port**: `8200` (web interface)
-- **Volumes**:
-  - Configuration: `${PRIMARY_PARTITION}/duplicati/config`
-  - Source: `${PRIMARY_PARTITION}` (entire primary partition available for backup)
-- **Environment Variables**:
-  - `PUID=1000` / `PGID=1000`: File ownership
-  - `TZ=Etc/UTC`: UTC timezone (recommended for backups)
-  - `SETTINGS_ENCRYPTION_KEY`: Encryption key for backup settings
-  - `DUPLICATI__WEBSERVICE_PASSWORD`: Web interface password
-- **Restart Policy**: `unless-stopped` (allows manual stopping without auto-restart)
+| Item | Value |
+|------|--------|
+| Network | default bridge |
+| Ports | **8200** → `8200` |
+| Config | `${PRIMARY_PARTITION}/duplicati/config` → `/config` |
+| Backup source | `${PRIMARY_PARTITION}` → `/source` (entire primary partition visible in UI) |
 
-### Immich
+**Environment:** `PUID=1000`, `PGID=1000`, `TZ=Etc/UTC`, `SETTINGS_ENCRYPTION_KEY`, `DUPLICATI__WEBSERVICE_PASSWORD`
 
-[Immich](https://immich.app/) is a self-hosted photo and video backup solution with features similar to Google Photos, including automatic backup, face recognition, and object detection.
+**Access:** `http://HOST:8200`
 
-**Components:**
-1. **immich-server**: Main application server
-   - **Port**: `2283` (API and web interface)
-   - **Volumes**: Upload location from `${PRIMARY_PARTITION}/${UPLOAD_LOCATION}`
-   - **Dependencies**: Requires `redis` and `database` services
+**Notes:** `restart: unless-stopped` — stays stopped if you stop it manually.
 
-2. **immich-machine-learning**: ML service for face recognition and object detection
-   - **Volumes**: Model cache (Docker volume `model-cache`)
-   - **Note**: Can be configured for hardware acceleration (CUDA, OpenVINO, etc.)
+---
 
-3. **redis**: In-memory data store (using Valkey fork)
-   - Used for caching and job queues
-   - Health check: Redis ping command
+### Radarr
 
-4. **database**: PostgreSQL database with vector extension
-   - **Image**: Custom Immich PostgreSQL with pgvector extension
-   - **Volumes**: Database files from `${PRIMARY_PARTITION}/${DB_DATA_LOCATION}`
-   - **Shared Memory**: 128MB (required for PostgreSQL)
+**Image:** `lscr.io/linuxserver/radarr:latest`  
+**Purpose:** Movie collection manager; integrates with download clients and Plex.
 
-**Configuration**: Immich services use an `.env` file for configuration. See [Immich documentation](https://immich.app/docs) for required environment variables.
+| Item | Value |
+|------|--------|
+| Network | default bridge |
+| Ports | **7878** → `7878` |
+| Config | `${PRIMARY_PARTITION}/radarr/data` → `/config` |
+| Movies | `${SECONDARY_PARTITION}/plex_data/movies` → `/movies` |
+| Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads` |
 
-## Optional Services (Currently Commented Out)
+**Environment:** `PUID=1000`, `PGID=1000`, `TZ=Etc/UTC`
 
-The following services are defined but commented out in `docker-compose.yml`. Uncomment them if needed:
+**Access:** `http://HOST:7878`
 
-### Passbolt
-Self-hosted password manager. Requires MariaDB and SMTP configuration.
+**Setup:** Add qBittorrent as download client (`HOST:8080` or container IP), set root folder `/movies`, connect Plex in Settings → Connect.
 
-### n8n
-Workflow automation tool for connecting different services and APIs.
+---
 
-### rclone
-Command-line program for managing files on cloud storage services.
+### Sonarr
+
+**Image:** `lscr.io/linuxserver/sonarr:latest`  
+**Purpose:** TV series manager; same workflow as Radarr for shows.
+
+| Item | Value |
+|------|--------|
+| Network | default bridge |
+| Ports | **8989** → `8989` |
+| Config | `${PRIMARY_PARTITION}/sonarr/data` → `/config` |
+| TV | `${SECONDARY_PARTITION}/plex_data/tv` → `/tv` |
+| Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads` |
+
+**Environment:** `PUID=1000`, `PGID=1000`, `TZ=Etc/UTC`
+
+**Access:** `http://HOST:8989`
+
+**Setup:** Point download client at qBittorrent; root folder `/tv`; link Plex in Connect.
+
+---
+
+### Seerr
+
+**Image:** `ghcr.io/seerr-team/seerr:latest`  
+**Purpose:** Request and discover movies/TV (Overseerr successor); talks to Plex, Radarr, and Sonarr.
+
+| Item | Value |
+|------|--------|
+| Network | default bridge |
+| Ports | **5055** → `5055` |
+| Config | `${PRIMARY_PARTITION}/seer` → `/app/config` |
+
+**Environment:** `LOG_LEVEL=debug`, `TZ=Asia/Tashkent`, `PORT=5055`
+
+**Health check:** HTTP `GET /api/v1/settings/public` on port 5055 inside container.
+
+**Access:** `http://HOST:5055`
+
+**Setup:** On first run, connect Plex, then Radarr (`http://HOST:7878`) and Sonarr (`http://HOST:8989`). Use host LAN IP or Docker host gateway IP from containers if discovery fails.
+
+---
+
+## Optional services (commented out in compose)
+
+Uncomment blocks in `docker-compose.yml` and add any required env vars before use.
+
+| Service | Ports | Notes |
+|---------|-------|--------|
+| **Passbolt** | `8081` → 80, `4443` → 443 | Password manager; depends on `mariadb`, SMTP vars, `${DOMAIN}` |
+| **n8n** | host (app chooses port, often **5678**) | Workflow automation; SMTP and timezone in env |
+| **rclone** | `5572` | `rcd` web UI, `--rc-no-auth` in compose — secure before exposing |
+| **Immich** | `2283` | `immich-server`, `immich-machine-learning`, Valkey `redis`, Postgres `database`; uses `.env` per [Immich docs](https://immich.app/docs) |
+| **cloudflared** | none (outbound tunnel) | `CLOUDFLARE_TOKEN` for Cloudflare Tunnel |
+
+---
 
 ## Configuration
 
-### Environment Variables
+### Environment variables
 
-The setup utilizes a `.env` file for managing environment variables. Create a `.env` file in the project root with the following variables:
+Copy [`.env.example`](.env.example) to `.env` and fill in values.
 
-#### Required Variables
+**Required for core stack**
 
-- **`PRIMARY_PARTITION`**: Primary storage path (e.g., `/mnt/storage` or `/media/primary`)
-  - Used for: Service configurations, databases, application data
-- **`SECONDARY_PARTITION`**: Secondary storage path (e.g., `/mnt/media` or `/media/secondary`)
-  - Used for: Media files, downloads, large data files
+| Variable | Used by |
+|----------|---------|
+| `PRIMARY_PARTITION` | All persistent config and app data paths |
+| `SECONDARY_PARTITION` | Media libraries and downloads |
+| `PLEX_CLAIM` | Plex first-time claim |
+| `MARIADB_ROOT_PASSWORD` | MariaDB root |
+| `MARIADB_PASSWORD` | MariaDB `passbolt` user (and related) |
+| `PHOTOPRISM_ADMIN_PASSWORD` | PhotoPrism UI |
+| `PHOTOPRISM_MYSQL_PASSWORD` | PhotoPrism DB user in DSN |
+| `MYSQL_DB_HOST` | PhotoPrism → MariaDB hostname (`mariadb` on `my-network`) |
+| `SETTINGS_ENCRYPTION_KEY` | Duplicati settings encryption |
+| `DUPLICATI_PASSWORD` | Duplicati web UI (`DUPLICATI__WEBSERVICE_PASSWORD`) |
 
-#### Service-Specific Variables
+**Optional / disabled services**
 
-- **Plex**:
-  - `PLEX_CLAIM`: Claim token from [plex.tv/claim](https://www.plex.tv/claim)
+| Variable | Used by |
+|----------|---------|
+| `EMAIL`, `SMTP_PASSWORD` | Passbolt, n8n |
+| `DOMAIN` | Passbolt, OpenVPN client generation |
+| `NAME`, `SURNAME` | Passbolt admin registration |
+| `CLOUDFLARE_TOKEN` | cloudflared |
+| Immich block in `.env.example` | `UPLOAD_LOCATION`, `DB_*`, `TZ`, etc. |
 
-- **PhotoPrism**:
-  - `PHOTOPRISM_ADMIN_PASSWORD`: Admin password for PhotoPrism
-  - `PHOTOPRISM_MYSQL_PASSWORD`: Password for PhotoPrism MySQL user
-  - `MYSQL_DB_HOST`: MariaDB hostname (typically `mariadb`)
+**Compose project**
 
-- **MariaDB**:
-  - `MARIADB_ROOT_PASSWORD`: Root password for MariaDB
-  - `MARIADB_PASSWORD`: Password for application database users
+| Variable | Purpose |
+|----------|---------|
+| `COMPOSE_PROJECT_NAME` | Docker Compose project name (default `nas` in example) |
 
-- **Duplicati**:
-  - `SETTINGS_ENCRYPTION_KEY`: Encryption key for backup settings
-  - `DUPLICATI_PASSWORD`: Web interface password
+### External Docker volume (OpenVPN)
 
-- **Immich**:
-  - `IMMICH_VERSION`: Image version tag (defaults to `release`)
-  - `UPLOAD_LOCATION`: Path relative to `PRIMARY_PARTITION` for uploaded media
-  - `DB_PASSWORD`: PostgreSQL password
-  - `DB_USERNAME`: PostgreSQL username
-  - `DB_DATABASE_NAME`: PostgreSQL database name
-  - `DB_DATA_LOCATION`: Path relative to `PRIMARY_PARTITION` for database files
-  - Additional variables as per [Immich documentation](https://immich.app/docs/install/environment-variables)
+Create before first `docker compose up` if not present:
 
-- **OpenVPN**:
-  - `DOMAIN`: Your domain name for VPN access
+```bash
+docker volume create ovpn-data-nas
+```
 
-#### Optional Variables (for commented services)
-
-- `EMAIL`: Email address for notifications
-- `SMTP_PASSWORD`: SMTP server password
-- `DOMAIN`: Domain name for services
-- `NAME` / `SURNAME`: For Passbolt user creation
-
-### Network Configuration
-
-The setup uses two network modes:
-
-1. **Host Mode** (`network_mode: host`): Services that need direct access to the host network
-   - Plex, Home Assistant, Nginx Proxy Manager
-   - These services bind directly to host ports
-
-2. **Bridge Network** (`my-network`): Custom network for inter-service communication
-   - qBittorrent, PhotoPrism, MariaDB, OpenVPN
-   - Services can communicate using container names as hostnames
-
-### Volume Structure
+### Volume layout
 
 ```
 ${PRIMARY_PARTITION}/
-├── plex/library/          # Plex configuration and metadata
-├── hass/                  # Home Assistant configuration
-├── qbt/                   # qBittorrent configuration
-├── photoprism/            # PhotoPrism storage
-├── photoprism_raw/        # PhotoPrism original photos
-├── nginx/
-│   ├── data/              # Nginx Proxy Manager data
-│   └── letsencrypt/       # SSL certificates
-├── mysql/                 # MariaDB database files
-├── openvpn/               # OpenVPN configuration and certificates
-├── duplicati/config/      # Duplicati configuration
-└── [immich paths]/        # Immich uploads and database
+├── plex/library/
+├── hass/
+├── qbt/
+├── photoprism/
+├── photoprism_raw/
+├── nginx/data/
+├── nginx/letsencrypt/
+├── mysql/
+├── duplicati/config/
+├── radarr/data/
+├── sonarr/data/
+├── seer/                    # Seerr config (compose path name)
+└── openvpn/                 # used by OVPN setup scripts (OVPN_DATA)
 
 ${SECONDARY_PARTITION}/
-├── plex_data/
-│   ├── tv/                # TV shows library
-│   ├── movies/            # Movies library
-│   ├── doc/               # Documentaries library
-│   └── cameras/           # Camera footage
-└── downloads/             # qBittorrent downloads
+├── plex_data/tv/
+├── plex_data/movies/
+├── plex_data/doc/
+├── plex_data/cameras/
+└── downloads/
 ```
 
-## Installation Instructions
+---
+
+## Installation
 
 ### Prerequisites
 
-- Docker and Docker Compose installed
-- Sufficient disk space for your media and data
-- Proper file permissions on storage partitions
+- Docker Engine and Docker Compose plugin
+- Disk space on primary and secondary paths
+- UID/GID **1000** for LinuxServer images (or change `PUID`/`PGID` in compose)
+- For OpenVPN: kernel TUN (`/dev/net/tun`) and external volume `ovpn-data-nas`
 
-### Setup Steps
+### Steps
 
-1. **Clone this repository:**
+1. Clone the repo and enter the directory.
+
+2. Create `.env` from the example and set paths and secrets:
+
    ```bash
-   git clone <repository-url>
-   cd nas_config
-   ```
-
-2. **Create and configure `.env` file:**
-   ```bash
-   # Copy example if available, or create new .env file
-   # Edit .env and set all required variables
+   cp .env.example .env
    nano .env
    ```
 
-3. **Create necessary directories:**
+3. Create data directories (adjust paths to match `.env`):
+
    ```bash
-   # Ensure PRIMARY_PARTITION and SECONDARY_PARTITION directories exist
-   mkdir -p ${PRIMARY_PARTITION}/{plex/library,hass,qbt,photoprism,photoprism_raw,nginx/{data,letsencrypt},mysql,openvpn,duplicati/config}
-   mkdir -p ${SECONDARY_PARTITION}/{plex_data/{tv,movies,doc,cameras},downloads}
+   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,qbt,photoprism,photoprism_raw,nginx/{data,letsencrypt},mysql,duplicati/config,radarr/data,sonarr/data,seer}
+   mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc,cameras},downloads}
    ```
 
-4. **Set proper permissions:**
+4. Set ownership for LinuxServer containers (if needed):
+
    ```bash
-   # Adjust ownership if needed (PUID=1000, PGID=1000)
-   sudo chown -R 1000:1000 ${PRIMARY_PARTITION} ${SECONDARY_PARTITION}
+   sudo chown -R 1000:1000 "${PRIMARY_PARTITION}" "${SECONDARY_PARTITION}"
    ```
 
-5. **Start services:**
+5. Create OpenVPN volume and start the stack:
+
    ```bash
-   docker-compose up -d
+   docker volume create ovpn-data-nas
+   docker compose up -d
    ```
 
-6. **Check service status:**
+6. Verify:
+
    ```bash
-   docker-compose ps
-   docker-compose logs -f [service-name]
+   docker compose ps
+   docker compose logs -f SERVICE_NAME
    ```
 
-## Service Access
+---
 
-After starting the services, access them at:
+## OpenVPN setup
 
-- **Plex**: `http://your-server-ip:32400/web` (or use Plex apps)
-- **Home Assistant**: `http://your-server-ip:8123`
-- **qBittorrent**: `http://your-server-ip:8080` (default credentials: admin/adminadmin)
-- **PhotoPrism**: `http://your-server-ip:2342/photoprism/`
-- **Nginx Proxy Manager**: `http://your-server-ip:81` (default credentials: admin@example.com/changeme)
-- **Duplicati**: `http://your-server-ip:8200`
-- **Immich**: `http://your-server-ip:2283`
-- **MariaDB**: `your-server-ip:3306` (for database connections)
-
-## Additional Configuration
-
-### OpenVPN Setup
-
-1. **Initialize OpenVPN configuration:**
-   ```bash
-   export OVPN_DATA=${PRIMARY_PARTITION}/openvpn
-   docker run -v $OVPN_DATA:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u udp://${DOMAIN}
-   docker run -v $OVPN_DATA:/etc/openvpn --rm -it kylemanna/openvpn ovpn_initpki
-   ```
-
-2. **Generate client certificate:**
-   ```bash
-   docker run -v $OVPN_DATA:/etc/openvpn --rm -it kylemanna/openvpn easyrsa build-client-full ${DOMAIN} nopass
-   ```
-
-3. **Retrieve client configuration:**
-   ```bash
-   docker run -v $OVPN_DATA:/etc/openvpn --rm kylemanna/openvpn ovpn_getclient ${DOMAIN} > ${DOMAIN}.ovpn
-   ```
-
-### Passbolt Setup (if enabled)
-
-1. **Change ownership of Passbolt config folder:**
-   ```bash
-   sudo chown -R www-data:www-data ${PRIMARY_PARTITION}/passbolt
-   ```
-
-2. **Create admin user:**
-   ```bash
-   docker-compose exec passbolt su -m -c "/usr/share/php/passbolt/bin/cake \
-                                    passbolt register_user \
-                                    -u ${EMAIL} \
-                                    -f ${NAME} \
-                                    -l ${SURNAME} \
-                                    -r admin" -s /bin/sh www-data
-   ```
-
-### rclone Setup (if enabled)
+Uses volume `ovpn-data-nas` mounted at `/etc/openvpn`. Example flow (set `DOMAIN` in `.env`):
 
 ```bash
-docker run -it \
-    -v ${PRIMARY_PARTITION}/rclone:/config/rclone \
-    -v ${PRIMARY_PARTITION}/gcs:/data:gcs \
-    --net=host \
-    --user $(id -u):$(id -g) \
-    --privileged \
-    rclone/rclone \
-    config
+export OVPN_DATA="${PRIMARY_PARTITION}/openvpn"
+docker volume create ovpn-data-nas
+
+docker run -v ovpn-data-nas:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u udp://"${DOMAIN}"
+docker run -v ovpn-data-nas:/etc/openvpn --rm -it kylemanna/openvpn ovpn_initpki
+docker run -v ovpn-data-nas:/etc/openvpn --rm -it kylemanna/openvpn easyrsa build-client-full "${DOMAIN}" nopass
+docker run -v ovpn-data-nas:/etc/openvpn --rm kylemanna/openvpn ovpn_getclient "${DOMAIN}" > "${DOMAIN}.ovpn"
 ```
+
+Ensure the `openvpn` service is running and UDP **1194** is forwarded on your router if clients connect from the internet.
+
+---
+
+## Passbolt setup (if enabled)
+
+```bash
+sudo chown -R www-data:www-data "${PRIMARY_PARTITION}/passbolt"
+docker compose exec passbolt su -m -c "/usr/share/php/passbolt/bin/cake \
+  passbolt register_user -u ${EMAIL} -f ${NAME} -l ${SURNAME} -r admin" \
+  -s /bin/sh www-data
+```
+
+Web UI via published ports **8081** (HTTP) or **4443** (HTTPS), or via Nginx Proxy Manager.
+
+---
 
 ## Maintenance
 
-### Updating Services
+**Updates**
 
 ```bash
-# Pull latest images
-docker-compose pull
-
-# Recreate containers with new images
-docker-compose up -d
-
-# Remove unused images
+docker compose pull
+docker compose up -d
 docker image prune
 ```
 
-### Backup Recommendations
+**Backups**
 
-- **Configuration files**: Backup `${PRIMARY_PARTITION}` (excluding large media files)
-- **Database**: Use Duplicati or manual database dumps for MariaDB and PostgreSQL
-- **Media files**: Consider separate backup strategy for `${SECONDARY_PARTITION}`
+- Config and DBs: `${PRIMARY_PARTITION}` (Duplicati can backup `/source` → primary partition)
+- Large media: plan separately for `${SECONDARY_PARTITION}`
+- MariaDB: periodic dumps if not fully covered by Duplicati
 
-### Logs and Troubleshooting
+**Logs**
 
 ```bash
-# View logs for all services
-docker-compose logs -f
-
-# View logs for specific service
-docker-compose logs -f [service-name]
-
-# Check service status
-docker-compose ps
-
-# Restart a service
-docker-compose restart [service-name]
-
-# Recreate a service
-docker-compose up -d --force-recreate [service-name]
+docker compose logs -f
+docker compose logs -f SERVICE_NAME
+docker compose restart SERVICE_NAME
+docker compose up -d --force-recreate SERVICE_NAME
 ```
 
-## Security Considerations
+---
 
-⚠️ **Important Security Notes:**
+## Security
 
-1. **Change default passwords** immediately after first login (qBittorrent, Nginx Proxy Manager, etc.)
-2. **Use strong passwords** for all services, especially databases
-3. **Configure firewall rules** to restrict access to services
-4. **Use Nginx Proxy Manager** with SSL certificates for external access
-5. **Keep services updated** regularly
-6. **Review file permissions** on mounted volumes
-7. **Secure OpenVPN** with strong certificates and authentication
-8. **Limit network exposure** - only expose necessary ports
+1. Change default passwords (qBittorrent, Nginx Proxy Manager, PhotoPrism, Duplicati).
+2. Do not expose MariaDB **3306** to the internet without strict firewall rules.
+3. Prefer HTTPS via Nginx Proxy Manager for web UIs accessed remotely.
+4. Restrict host firewall to needed ports; VPN for admin access is preferable to wide port forwarding.
+5. Keep images updated (`docker compose pull`).
+6. OpenVPN: use strong PKI; protect `.ovpn` files.
+7. If enabling rclone RC, do not use `--rc-no-auth` on untrusted networks.
 
-## Recent Improvements
-
-The Docker Compose configuration has been optimized by:
-
-- **Removed redundant environment variables**: `PRIMARY_PARTITION` and `SECONDARY_PARTITION` were removed from service environment sections where they were only used in volume paths, not by the containers themselves
-- **Fixed duplicate port mapping**: qBittorrent's port 6881 mapping was consolidated into explicit TCP and UDP mappings
-- **Improved maintainability**: Cleaner configuration makes it easier to understand and modify
+---
 
 ## Troubleshooting
 
-### Common Issues
+| Issue | Things to check |
+|-------|------------------|
+| Permission denied on volumes | `PUID`/`PGID` 1000; `chown` on mount paths |
+| Port already in use | `ss -tulpn \| grep PORT` on the host |
+| PhotoPrism DB errors | `mariadb` running on `my-network`; DSN, DB name, user, password |
+| *arr / Seerr cannot reach qBittorrent | Use host IP and port **8080**, not container name (different networks) |
+| Plex not visible | Claim with fresh `PLEX_CLAIM`; host networking and firewall on **32400** |
+| OpenVPN fails to start | `ovpn-data-nas` exists; `/dev/net/tun`; `NET_ADMIN` |
 
-1. **Permission errors**: Ensure PUID/PGID match your user, or adjust file ownership
-2. **Port conflicts**: Check if ports are already in use: `sudo netstat -tulpn | grep [port]`
-3. **Network issues**: Verify network mode settings match service requirements
-4. **Volume mount errors**: Ensure paths exist and have correct permissions
-5. **Database connection issues**: Check if dependent services are running and network connectivity
-
-### Getting Help
-
-- Check service-specific documentation
-- Review Docker Compose logs
-- Verify environment variables are set correctly
-- Ensure all prerequisites are met
+---
 
 ## License
 
