@@ -41,6 +41,18 @@ services:
     network_mode: host
     restart: always
 
+  go2rtc:
+    image: alexxit/go2rtc
+    container_name: go2rtc
+    network_mode: host
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Athens
+    volumes:
+      - ./go2rtc:/config
+
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbit

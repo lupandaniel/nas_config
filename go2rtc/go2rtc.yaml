@@ -1,0 +1,24 @@
+# Secrets live in .env — see .env.example (GO2RTC_* vars)
+# WebUI: http://<nas-ip>:1984
+# Restream: rtsp://<nas-ip>:8554/<stream_name>
+
+api:
+  listen: ":1984"
+  username: ${GO2RTC_API_USERNAME}
+  password: ${GO2RTC_API_PASSWORD}
+
+rtsp:
+  listen: ":8554"
+  username: ${GO2RTC_RTSP_USERNAME}
+  password: ${GO2RTC_RTSP_PASSWORD}
+
+webrtc:
+  listen: ":8555"
+
+streams:
+  # Add one key per camera; only list cameras you have set in .env
+  fata: ${FATA_URL}
+  spate: ${SPATE_URL}
+  sopru: ${SOPRU_URL}
+  pod: ${POD_URL}
+  terasa: ${TERASA_URL}
