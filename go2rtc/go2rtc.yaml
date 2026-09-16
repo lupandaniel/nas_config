@@ -14,6 +14,8 @@ rtsp:
 
 webrtc:
   listen: ":8555"
+  candidates:
+  - 192.168.0.105:8555
 
 streams:
   # Add one key per camera; only list cameras you have set in .env
