@@ -143,7 +143,7 @@ Replace `HOST` with your server IP or hostname.
 | Ports | **8971** (authenticated UI/API) — **not** 8554/8555 (owned by go2rtc) |
 | Config DB | `${PRIMARY_PARTITION}/frigate` → `/config` |
 | Config file | [`frigate/config.yml`](frigate/config.yml) → `/config/config.yml` |
-| Media | `${PRIMARY_PARTITION}/frigate/media` → `/media/frigate` |
+| Media | `${PRIMARY_PARTITION}/frigate_media` → `/media/frigate` |
 | Devices | `/dev/dri` (Intel VAAPI + OpenVINO GPU) |
 | shm | `512mb` |
 
@@ -401,7 +401,7 @@ ${PRIMARY_PARTITION}/
 ├── plex/library/
 ├── hass/
 ├── frigate/                 # DB / models
-│   └── media/               # recordings / clips / exports
+├── frigate_media/           # recordings / clips / exports
 ├── qbt/
 ├── nginx/data/
 ├── nginx/letsencrypt/
@@ -450,7 +450,7 @@ ${SECONDARY_PARTITION}/
 3. Create data directories (adjust paths to match `.env`):
 
    ```bash
-   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,frigate/media,qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
+   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,frigate,frigate_media,qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
    mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc},downloads}
    ```
 
@@ -510,7 +510,7 @@ docker image prune
 
 - Config and DBs: `${PRIMARY_PARTITION}` (Duplicati can backup `/source` → primary partition)
 - Large media: plan separately for `${SECONDARY_PARTITION}`
-- Frigate recordings live under `${PRIMARY_PARTITION}/frigate/media` (included in primary backups if Duplicati covers `/source`)
+- Frigate recordings live under `${PRIMARY_PARTITION}/frigate_media` (included in primary backups if Duplicati covers `/source`)
 - Immich Postgres: periodic dumps if not fully covered by Duplicati
 
 **Logs**

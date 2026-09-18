@@ -24,7 +24,7 @@ ffmpeg:
 
 # Loop storage: keep all video for N days, then motion longer, then alerts/detections longest.
 # Frigate also auto-deletes oldest segments if the disk is nearly full.
-# Tune `continuous.days` to fit ${PRIMARY_PARTITION}/frigate/media (5 cams use a lot of space).
+# Tune `continuous.days` to fit ${PRIMARY_PARTITION}/frigate_media (5 cams use a lot of space).
 record:
   enabled: true
   continuous:

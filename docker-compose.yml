@@ -65,7 +65,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ${PRIMARY_PARTITION}/frigate:/config
       - ./frigate/config.yml:/config/config.yml
-      - ${PRIMARY_PARTITION}/frigate/media:/media/frigate
+      # Recordings must live on primary (not nested under /config mount)
+      - ${PRIMARY_PARTITION}/frigate_media:/media/frigate
       - type: tmpfs
         target: /tmp/cache
         tmpfs:
