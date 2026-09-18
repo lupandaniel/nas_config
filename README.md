@@ -1,12 +1,12 @@
 # Home Server Setup
 
-Docker Compose stack for media streaming, downloads, photo management, home automation, reverse proxy, backups, and VPN access. All services are defined in [`docker-compose.yml`](docker-compose.yml).
+Docker Compose stack for media streaming, downloads, photo management, home automation, camera restreaming/NVR, reverse proxy, backups, and VPN access. All services are defined in [`docker-compose.yml`](docker-compose.yml).
 
 ## Application ports
 
 Replace `HOST` with your server IP or hostname.
 
-**Host network** (`plex`, `hass`, `nginx`): ports bind on the machine directly — nothing is listed under `ports:` in compose; defaults below are what each app uses.
+**Host network** (`plex`, `hass`, `go2rtc`, `nginx`): ports bind on the machine directly — nothing is listed under `ports:` in compose; defaults below are what each app uses.
 
 **Published ports** (everything else): `host:container` mappings from compose.
 
@@ -18,19 +18,23 @@ Replace `HOST` with your server IP or hostname.
 | Plex | 32469 | UDP | host | DLNA (if enabled in Plex) |
 | Plex | 32443 | TCP | host | HTTPS (if enabled in Plex) |
 | Home Assistant | 8123 | TCP | host | Web UI |
+| go2rtc | 1984 | TCP | host | Web UI / API |
+| go2rtc | 8554 | TCP | host | RTSP restream |
+| go2rtc | 8555 | TCP/UDP | host | WebRTC |
 | Nginx Proxy Manager | 80 | TCP | host | HTTP (proxied sites) |
 | Nginx Proxy Manager | 443 | TCP | host | HTTPS (proxied sites) |
 | Nginx Proxy Manager | 81 | TCP | host | Admin UI |
+| Frigate | 8971 | TCP | `8971:8971` | Authenticated Web UI / API |
 | qBittorrent | 8080 | TCP | `8080:8080` | Web UI |
 | qBittorrent | 6881 | TCP | `6881:6881` | BitTorrent peers |
 | qBittorrent | 6881 | UDP | `6881:6881` | BitTorrent peers |
-| PhotoPrism | 2342 | TCP | `2342:2342` | Web UI |
-| MariaDB | 3306 | TCP | `3306:3306` | MySQL/MariaDB |
 | OpenVPN | 1194 | UDP | `1194:1194` | VPN tunnel |
 | Duplicati | 8200 | TCP | `8200:8200` | Web UI |
 | Radarr | 7878 | TCP | `7878:7878` | Web UI |
 | Sonarr | 8989 | TCP | `8989:8989` | Web UI |
 | Seerr | 5055 | TCP | `5055:5055` | Web UI |
+| Prowlarr | 9696 | TCP | `9696:9696` | Web UI |
+| Immich | 2283 | TCP | `2283:2283` | Web UI / API |
 
 ### Quick access URLs (active)
 
@@ -38,37 +42,29 @@ Replace `HOST` with your server IP or hostname.
 |-----|-----|
 | Plex | `http://HOST:32400/web` |
 | Home Assistant | `http://HOST:8123` |
+| go2rtc | `http://HOST:1984` |
+| Frigate | `http://HOST:8971` |
 | Nginx Proxy Manager | `http://HOST:81` |
 | qBittorrent | `http://HOST:8080` |
-| PhotoPrism | `http://HOST:2342/photoprism/` |
-| MariaDB | `HOST:3306` |
 | Duplicati | `http://HOST:8200` |
 | Radarr | `http://HOST:7878` |
 | Sonarr | `http://HOST:8989` |
 | Seerr | `http://HOST:5055` |
+| Prowlarr | `http://HOST:9696` |
+| Immich | `http://HOST:2283` |
 | OpenVPN | UDP `HOST:1194` (client `.ovpn` file) |
-
-### Optional services (commented out in compose)
-
-| App | Port | Protocol | Mapping | Purpose |
-|-----|------|----------|---------|---------|
-| Passbolt | 8081 | TCP | `8081:80` | HTTP web UI |
-| Passbolt | 4443 | TCP | `4443:443` | HTTPS web UI |
-| n8n | 5678 | TCP | host | Web UI (default; not set in compose) |
-| rclone | 5572 | TCP | `5572:5572` | Remote control web UI |
-| Immich | 2283 | TCP | `2283:2283` | Web UI / API |
-| Cloudflare Tunnel | — | — | — | Outbound only; no inbound host ports |
 
 ---
 
 ## Overview
 
-- **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps) and `SECONDARY_PARTITION` (media and downloads). Set both in `.env`.
+- **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps) and `SECONDARY_PARTITION` (media, downloads, Frigate recordings). Set both in `.env`.
 - **Networks**:
-  - **`host`**: Plex, Home Assistant, Nginx Proxy Manager — use the host’s ports directly.
-  - **`my-network`**: qBittorrent, PhotoPrism, MariaDB, OpenVPN — can resolve each other by container name (e.g. `mariadb:3306`).
-  - **Default project bridge**: Duplicati, Radarr, Sonarr, Seerr — published ports only; not on `my-network`.
-- **Restart**: Most services use `restart: always`; Duplicati, Radarr, Sonarr, and Seerr use `restart: unless-stopped`.
+  - **`host`**: Plex, Home Assistant, go2rtc, Nginx Proxy Manager — use the host’s ports directly.
+  - **`my-network`**: Frigate, qBittorrent, OpenVPN — can resolve each other by container name.
+  - **Default project bridge**: Duplicati, Radarr, Sonarr, Seerr, Prowlarr, Immich (+ Valkey/Postgres) — published ports only; not on `my-network`.
+- **Cameras**: go2rtc owns camera connections and restreams on **8554** / **8555**. Frigate consumes those restreams (does not publish 8554/8555).
+- **Restart**: Most services use `restart: always`; Frigate, Duplicati, Radarr, Sonarr, Seerr, and Prowlarr use `restart: unless-stopped`.
 
 ---
 
@@ -77,7 +73,7 @@ Replace `HOST` with your server IP or hostname.
 ### Plex Media Server
 
 **Image:** `lscr.io/linuxserver/plex:latest`  
-**Purpose:** Organize and stream TV, movies, documentaries, and camera footage.
+**Purpose:** Organize and stream TV, movies, and documentaries.
 
 | Item | Value |
 |------|--------|
@@ -87,7 +83,6 @@ Replace `HOST` with your server IP or hostname.
 | Libraries | `${SECONDARY_PARTITION}/plex_data/tv` → `/tv` |
 | | `${SECONDARY_PARTITION}/plex_data/movies` → `/movies` |
 | | `${SECONDARY_PARTITION}/plex_data/doc` → `/documentaries` |
-| | `${SECONDARY_PARTITION}/plex_data/cameras` → `/cameras` |
 
 **Environment:** `PUID=1000`, `PGID=1000`, `VERSION=docker`, `PLEX_CLAIM` (from [plex.tv/claim](https://www.plex.tv/claim)), plus partition vars passed through.
 
@@ -114,7 +109,53 @@ Replace `HOST` with your server IP or hostname.
 
 **Access:** `http://HOST:8123`
 
-**Notes:** Runs **privileged** for hardware access. Adjust `devices` if your USB serial path differs.
+**Notes:** Runs **privileged** for hardware access. Adjust `devices` if your USB serial path differs. For Frigate automations, add an MQTT broker and enable MQTT in Frigate + the [Frigate HA integration](https://docs.frigate.video/integrations/home-assistant/).
+
+---
+
+### go2rtc
+
+**Image:** `alexxit/go2rtc`  
+**Purpose:** Camera ingest and restream (RTSP/WebRTC) for Home Assistant, Frigate, and browsers.
+
+| Item | Value |
+|------|--------|
+| Network | `host` |
+| Ports | **1984** (UI/API), **8554** (RTSP), **8555** (WebRTC) |
+| Config | [`go2rtc/go2rtc.yaml`](go2rtc/go2rtc.yaml) → `/config` |
+
+**Environment:** Loaded from `.env` (`GO2RTC_*`, camera `*_URL` vars). `TZ=Europe/Athens`.
+
+**Access:** `http://HOST:1984` — RTSP restreams at `rtsp://HOST:8554/<stream_name>` (e.g. `fata`, `spate`, `sopru`, `pod`, `terasa`).
+
+**Notes:** Camera credentials live in `.env`, not in git. WebRTC candidate IP is set in `go2rtc.yaml`.
+
+---
+
+### Frigate
+
+**Image:** `ghcr.io/blakeblackshear/frigate:stable`  
+**Purpose:** NVR with object detection; cameras come from go2rtc restreams.
+
+| Item | Value |
+|------|--------|
+| Network | `my-network` (+ `host.docker.internal` → host gateway) |
+| Ports | **8971** (authenticated UI/API) — **not** 8554/8555 (owned by go2rtc) |
+| Config DB | `${PRIMARY_PARTITION}/frigate` → `/config` |
+| Config file | [`frigate/config.yml`](frigate/config.yml) → `/config/config.yml` |
+| Media | `${SECONDARY_PARTITION}/frigate` → `/media/frigate` |
+| Devices | `/dev/dri` (Intel VAAPI + OpenVINO GPU) |
+| shm | `512mb` |
+
+**Environment:** `TZ=Europe/Athens`; RTSP auth from `GO2RTC_RTSP_*` (mapped into Frigate as `FRIGATE_RTSP_*`).
+
+**Access:** `http://HOST:8971` — on first start, admin password is printed in `docker logs frigate`.
+
+**Notes:**
+
+- MQTT is disabled in config until you add a broker (needed for Home Assistant integration).
+- Uses OpenVINO on GPU and `preset-vaapi` for decode (ThinkCentre / Intel UHD style hosts).
+- Do not map Frigate’s 8554/8555 while standalone go2rtc is running.
 
 ---
 
@@ -137,32 +178,6 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
-### PhotoPrism
-
-**Image:** `photoprism/photoprism`  
-**Purpose:** AI-assisted photo library; metadata stored in MariaDB.
-
-| Item | Value |
-|------|--------|
-| Network | `my-network` (DB host must be reachable, typically `mariadb`) |
-| Ports | **2342** → container `2342` |
-| Storage | `${PRIMARY_PARTITION}/photoprism` → `/photoprism/storage` |
-| Originals | `${PRIMARY_PARTITION}/photoprism_raw` → `/photoprism/originals` |
-
-**Environment:**
-
-- `PHOTOPRISM_ADMIN_PASSWORD` — admin login
-- `PHOTOPRISM_MYSQL_PASSWORD` — DB user password (in DSN)
-- `MYSQL_DB_HOST` — e.g. `mariadb`
-- `PHOTOPRISM_DATABASE_DRIVER=mysql`
-- `PHOTOPRISM_DATABASE_DSN=photoprism:…@tcp(mariadb:3306)/photoprism?…`
-- `PHOTOPRISM_SITE_URL=http://localhost:2342/photoprism/` (adjust if using a reverse proxy)
-- `PHOTOPRISM_UPLOAD_NSFW=true`
-
-**Access:** `http://HOST:2342/photoprism/`
-
----
-
 ### Nginx Proxy Manager
 
 **Image:** `jc21/nginx-proxy-manager:latest`  
@@ -177,31 +192,7 @@ Replace `HOST` with your server IP or hostname.
 
 **Access:** `http://HOST:81` — default login `admin@example.com` / `changeme` (change immediately).
 
-**Notes:** Point public DNS at this host and create proxy hosts in the UI for services you want on HTTPS (e.g. PhotoPrism, Seerr).
-
----
-
-### MariaDB
-
-**Image:** `mariadb:10.10`  
-**Purpose:** Database for PhotoPrism (and prepared `passbolt` DB/user if Passbolt is enabled later).
-
-| Item | Value |
-|------|--------|
-| Network | `my-network` |
-| Ports | **3306** → `3306` |
-| Data | `${PRIMARY_PARTITION}/mysql` → `/var/lib/mysql` |
-
-**Environment:**
-
-- `MARIADB_ROOT_PASSWORD`
-- `MARIADB_PASSWORD` — password for user `passbolt`
-- `MYSQL_DATABASE=passbolt`, `MYSQL_USER=passbolt`
-- `MARIADB_INITDB_SKIP_TZINFO=1`
-
-**Access:** From other containers on `my-network`: `mariadb:3306`. From host/LAN: `HOST:3306` (restrict with firewall).
-
-**Notes:** Create the PhotoPrism database/user separately if not already in your init scripts; DSN in compose expects database `photoprism` and user `photoprism`.
+**Notes:** Point public DNS at this host and create proxy hosts in the UI for services you want on HTTPS (e.g. Seerr, Frigate, Immich).
 
 ---
 
@@ -261,7 +252,7 @@ Replace `HOST` with your server IP or hostname.
 
 **Access:** `http://HOST:7878`
 
-**Setup:** Add qBittorrent as download client (`HOST:8080` or container IP), set root folder `/movies`, connect Plex in Settings → Connect.
+**Setup:** Add qBittorrent as download client (`HOST:8080` or container IP), set root folder `/movies`, connect Plex in Settings → Connect. Indexers via Prowlarr.
 
 ---
 
@@ -282,7 +273,7 @@ Replace `HOST` with your server IP or hostname.
 
 **Access:** `http://HOST:8989`
 
-**Setup:** Point download client at qBittorrent; root folder `/tv`; link Plex in Connect.
+**Setup:** Point download client at qBittorrent; root folder `/tv`; link Plex in Connect. Indexers via Prowlarr.
 
 ---
 
@@ -307,17 +298,43 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
-## Optional services (commented out in compose)
+### Prowlarr
 
-Uncomment blocks in `docker-compose.yml` and add any required env vars before use.
+**Image:** `lscr.io/linuxserver/prowlarr:latest`  
+**Purpose:** Indexer manager for Radarr/Sonarr (and other *arr apps).
 
-| Service | Ports | Notes |
-|---------|-------|--------|
-| **Passbolt** | `8081` → 80, `4443` → 443 | Password manager; depends on `mariadb`, SMTP vars, `${DOMAIN}` |
-| **n8n** | host (app chooses port, often **5678**) | Workflow automation; SMTP and timezone in env |
-| **rclone** | `5572` | `rcd` web UI, `--rc-no-auth` in compose — secure before exposing |
-| **Immich** | `2283` | `immich-server`, `immich-machine-learning`, Valkey `redis`, Postgres `database`; uses `.env` per [Immich docs](https://immich.app/docs) |
-| **cloudflared** | none (outbound tunnel) | `CLOUDFLARE_TOKEN` for Cloudflare Tunnel |
+| Item | Value |
+|------|--------|
+| Network | default bridge |
+| Ports | **9696** → `9696` |
+| Config | `${PRIMARY_PARTITION}/prowlarr` → `/config` |
+
+**Environment:** `PUID=1000`, `PGID=1000`, `TZ=Europe/Bucharest`
+
+**Access:** `http://HOST:9696`
+
+**Setup:** Add indexers in Prowlarr, then sync apps to Radarr/Sonarr.
+
+---
+
+### Immich
+
+**Images:** `immich-server`, `immich-machine-learning` (OpenVINO variant), Valkey `redis`, Immich Postgres `database`  
+**Purpose:** Self-hosted photo and video backup with ML features (faces, search).
+
+| Item | Value |
+|------|--------|
+| Network | default project bridge |
+| Ports | **2283** (server UI/API) |
+| Upload data | `${PRIMARY_PARTITION}/${IMMICH_UPLOAD_LOCATION}` → `/data` |
+| Postgres | `${PRIMARY_PARTITION}/${IMMICH_DB_DATA_LOCATION}` → `/var/lib/postgresql/data` |
+| Devices | `/dev/dri` on server and ML containers |
+
+**Environment:** See Immich block in [`.env.example`](.env.example) (`IMMICH_*`). ML image tag uses `IMMICH_ML_HWACCEL` (default `openvino`).
+
+**Access:** `http://HOST:2283`
+
+**Notes:** Follow [Immich docs](https://immich.app/docs) for first-run admin user.
 
 ---
 
@@ -325,38 +342,49 @@ Uncomment blocks in `docker-compose.yml` and add any required env vars before us
 
 ### Environment variables
 
-Copy [`.env.example`](.env.example) to `.env` and fill in values.
+Copy [`.env.example`](.env.example) to `.env` and fill in values. Variables are grouped by service in the example file.
 
-**Required for core stack**
-
-| Variable | Used by |
-|----------|---------|
-| `PRIMARY_PARTITION` | All persistent config and app data paths |
-| `SECONDARY_PARTITION` | Media libraries and downloads |
-| `PLEX_CLAIM` | Plex first-time claim |
-| `MARIADB_ROOT_PASSWORD` | MariaDB root |
-| `MARIADB_PASSWORD` | MariaDB `passbolt` user (and related) |
-| `PHOTOPRISM_ADMIN_PASSWORD` | PhotoPrism UI |
-| `PHOTOPRISM_MYSQL_PASSWORD` | PhotoPrism DB user in DSN |
-| `MYSQL_DB_HOST` | PhotoPrism → MariaDB hostname (`mariadb` on `my-network`) |
-| `SETTINGS_ENCRYPTION_KEY` | Duplicati settings encryption |
-| `DUPLICATI_PASSWORD` | Duplicati web UI (`DUPLICATI__WEBSERVICE_PASSWORD`) |
-
-**Optional / disabled services**
-
-| Variable | Used by |
-|----------|---------|
-| `EMAIL`, `SMTP_PASSWORD` | Passbolt, n8n |
-| `DOMAIN` | Passbolt, OpenVPN client generation |
-| `NAME`, `SURNAME` | Passbolt admin registration |
-| `CLOUDFLARE_TOKEN` | cloudflared |
-| Immich block in `.env.example` | `UPLOAD_LOCATION`, `DB_*`, `TZ`, etc. |
-
-**Compose project**
+**Shared**
 
 | Variable | Purpose |
 |----------|---------|
-| `COMPOSE_PROJECT_NAME` | Docker Compose project name (default `nas` in example) |
+| `COMPOSE_PROJECT_NAME` | Docker Compose project name (default `nas`) |
+| `PRIMARY_PARTITION` | Config, DBs, app data |
+| `SECONDARY_PARTITION` | Media libraries, downloads, Frigate recordings |
+| `DOMAIN` | Optional (OpenVPN client generation, public hostnames) |
+
+**Plex**
+
+| Variable | Purpose |
+|----------|---------|
+| `PLEX_CLAIM` | First-time server claim |
+
+**go2rtc**
+
+| Variable | Purpose |
+|----------|---------|
+| `GO2RTC_API_USERNAME` / `GO2RTC_API_PASSWORD` | Web UI / API auth |
+| `GO2RTC_RTSP_USERNAME` / `GO2RTC_RTSP_PASSWORD` | RTSP restream auth (also used by Frigate) |
+| `FATA_URL`, `SPATE_URL`, `SOPRU_URL`, `POD_URL`, `TERASA_URL` | Camera RTSP source URLs |
+
+**Duplicati**
+
+| Variable | Purpose |
+|----------|---------|
+| `DUPLICATI_PASSWORD` | Web UI (`DUPLICATI__WEBSERVICE_PASSWORD`) |
+| `SETTINGS_ENCRYPTION_KEY` | Settings encryption |
+
+**Immich**
+
+| Variable | Purpose |
+|----------|---------|
+| `IMMICH_VERSION` | Image tag (default `release`) |
+| `IMMICH_UPLOAD_LOCATION` | Upload path under primary partition |
+| `IMMICH_DB_DATA_LOCATION` | Postgres data path under primary partition |
+| `IMMICH_TZ` | Timezone |
+| `IMMICH_DB_PASSWORD` / `IMMICH_DB_USERNAME` / `IMMICH_DB_DATABASE_NAME` | Postgres credentials |
+| `IMMICH_DB_STORAGE_TYPE` | e.g. `HDD` |
+| `IMMICH_ML_HWACCEL` | ML image suffix (default `openvino`) |
 
 ### External Docker volume (OpenVPN)
 
@@ -372,24 +400,28 @@ docker volume create ovpn-data-nas
 ${PRIMARY_PARTITION}/
 ├── plex/library/
 ├── hass/
+├── frigate/                 # Frigate DB / models (config.yml bind-mounted from repo)
 ├── qbt/
-├── photoprism/
-├── photoprism_raw/
 ├── nginx/data/
 ├── nginx/letsencrypt/
-├── mysql/
 ├── duplicati/config/
 ├── radarr/data/
 ├── sonarr/data/
 ├── seer/                    # Seerr config (compose path name)
+├── prowlarr/
+├── immich/library/          # IMMICH_UPLOAD_LOCATION
+├── immich/postgres/         # IMMICH_DB_DATA_LOCATION
 └── openvpn/                 # used by OVPN setup scripts (OVPN_DATA)
 
 ${SECONDARY_PARTITION}/
 ├── plex_data/tv/
 ├── plex_data/movies/
 ├── plex_data/doc/
-├── plex_data/cameras/
-└── downloads/
+├── downloads/
+└── frigate/                 # recordings / clips / exports
+
+./go2rtc/                    # go2rtc.yaml (repo)
+./frigate/config.yml         # Frigate cameras / detectors (repo)
 ```
 
 ---
@@ -402,6 +434,7 @@ ${SECONDARY_PARTITION}/
 - Disk space on primary and secondary paths
 - UID/GID **1000** for LinuxServer images (or change `PUID`/`PGID` in compose)
 - For OpenVPN: kernel TUN (`/dev/net/tun`) and external volume `ovpn-data-nas`
+- For Frigate / Immich ML on Intel: `/dev/dri` available on the host
 
 ### Steps
 
@@ -417,8 +450,8 @@ ${SECONDARY_PARTITION}/
 3. Create data directories (adjust paths to match `.env`):
 
    ```bash
-   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,qbt,photoprism,photoprism_raw,nginx/{data,letsencrypt},mysql,duplicati/config,radarr/data,sonarr/data,seer}
-   mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc,cameras},downloads}
+   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,frigate,qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
+   mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc},downloads,frigate}
    ```
 
 4. Set ownership for LinuxServer containers (if needed):
@@ -441,6 +474,8 @@ ${SECONDARY_PARTITION}/
    docker compose logs -f SERVICE_NAME
    ```
 
+7. Frigate first login: `docker logs frigate` for the generated admin password, then open `http://HOST:8971`.
+
 ---
 
 ## OpenVPN setup
@@ -461,19 +496,6 @@ Ensure the `openvpn` service is running and UDP **1194** is forwarded on your ro
 
 ---
 
-## Passbolt setup (if enabled)
-
-```bash
-sudo chown -R www-data:www-data "${PRIMARY_PARTITION}/passbolt"
-docker compose exec passbolt su -m -c "/usr/share/php/passbolt/bin/cake \
-  passbolt register_user -u ${EMAIL} -f ${NAME} -l ${SURNAME} -r admin" \
-  -s /bin/sh www-data
-```
-
-Web UI via published ports **8081** (HTTP) or **4443** (HTTPS), or via Nginx Proxy Manager.
-
----
-
 ## Maintenance
 
 **Updates**
@@ -487,8 +509,8 @@ docker image prune
 **Backups**
 
 - Config and DBs: `${PRIMARY_PARTITION}` (Duplicati can backup `/source` → primary partition)
-- Large media: plan separately for `${SECONDARY_PARTITION}`
-- MariaDB: periodic dumps if not fully covered by Duplicati
+- Large media / Frigate recordings: plan separately for `${SECONDARY_PARTITION}`
+- Immich Postgres: periodic dumps if not fully covered by Duplicati
 
 **Logs**
 
@@ -503,13 +525,12 @@ docker compose up -d --force-recreate SERVICE_NAME
 
 ## Security
 
-1. Change default passwords (qBittorrent, Nginx Proxy Manager, PhotoPrism, Duplicati).
-2. Do not expose MariaDB **3306** to the internet without strict firewall rules.
-3. Prefer HTTPS via Nginx Proxy Manager for web UIs accessed remotely.
-4. Restrict host firewall to needed ports; VPN for admin access is preferable to wide port forwarding.
-5. Keep images updated (`docker compose pull`).
-6. OpenVPN: use strong PKI; protect `.ovpn` files.
-7. If enabling rclone RC, do not use `--rc-no-auth` on untrusted networks.
+1. Change default passwords (qBittorrent, Nginx Proxy Manager, Duplicati, Frigate admin).
+2. Prefer HTTPS via Nginx Proxy Manager for web UIs accessed remotely.
+3. Restrict host firewall to needed ports; VPN for admin access is preferable to wide port forwarding.
+4. Keep images updated (`docker compose pull`).
+5. OpenVPN: use strong PKI; protect `.ovpn` files.
+6. Protect go2rtc API/RTSP credentials; camera URLs in `.env` contain secrets — do not commit `.env`.
 
 ---
 
@@ -518,11 +539,13 @@ docker compose up -d --force-recreate SERVICE_NAME
 | Issue | Things to check |
 |-------|------------------|
 | Permission denied on volumes | `PUID`/`PGID` 1000; `chown` on mount paths |
-| Port already in use | `ss -tulpn \| grep PORT` on the host |
-| PhotoPrism DB errors | `mariadb` running on `my-network`; DSN, DB name, user, password |
+| Port already in use | `ss -tulpn \| grep PORT` on the host (go2rtc uses 1984/8554/8555) |
 | *arr / Seerr cannot reach qBittorrent | Use host IP and port **8080**, not container name (different networks) |
 | Plex not visible | Claim with fresh `PLEX_CLAIM`; host networking and firewall on **32400** |
 | OpenVPN fails to start | `ovpn-data-nas` exists; `/dev/net/tun`; `NET_ADMIN` |
+| Frigate cameras offline | go2rtc up; `GO2RTC_RTSP_*` set; stream names in `frigate/config.yml` |
+| Frigate / Immich GPU errors | `/dev/dri` present; OpenVINO/VAAPI supported on the CPU/iGPU |
+| Immich won't start | `IMMICH_DB_PASSWORD` set; Postgres path writable |
 
 ---
 

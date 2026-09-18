@@ -1,4 +1,3 @@
-#version: '3.8'
 services:
   plex:
     image: lscr.io/linuxserver/plex:latest
@@ -22,7 +21,6 @@ services:
       - ${SECONDARY_PARTITION}/plex_data/tv:/tv
       - ${SECONDARY_PARTITION}/plex_data/movies:/movies
       - ${SECONDARY_PARTITION}/plex_data/doc:/documentaries
-      - ${SECONDARY_PARTITION}/plex_data/cameras:/cameras
       - ${PRIMARY_PARTITION}/plex/transcode:/transcode
 
   homeassistant:
@@ -53,6 +51,36 @@ services:
     volumes:
       - ./go2rtc:/config
 
+  # NVR + detection; cameras come from standalone go2rtc (do not map 8554/8555 here).
+  # UI: http://<nas-ip>:8971
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: frigate
+    restart: unless-stopped
+    stop_grace_period: 30s
+    shm_size: 512mb
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${PRIMARY_PARTITION}/frigate:/config
+      - ./frigate/config.yml:/config/config.yml
+      - ${SECONDARY_PARTITION}/frigate:/media/frigate
+      - type: tmpfs
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    ports:
+      - "8971:8971"
+    environment:
+      TZ: Europe/Athens
+      FRIGATE_RTSP_USER: ${GO2RTC_RTSP_USERNAME}
+      FRIGATE_RTSP_PASSWORD: ${GO2RTC_RTSP_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - my-network
+
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbit
@@ -77,26 +105,6 @@ services:
     networks:
       - my-network
 
-  photoprism:
-    image: photoprism/photoprism
-    container_name: photoprism
-    restart: always
-    ports:
-      - 2342:2342
-    networks:
-      - my-network
-    environment:
-      - PHOTOPRISM_UPLOAD_NSFW=true
-      - PHOTOPRISM_ADMIN_PASSWORD=${PHOTOPRISM_ADMIN_PASSWORD}
-      - PHOTOPRISM_SITE_URL=http://localhost:2342/photoprism/
-      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
-      - SECONDARY_PARTITION=${SECONDARY_PARTITION}
-      - PHOTOPRISM_DATABASE_DSN=photoprism:${PHOTOPRISM_MYSQL_PASSWORD}@tcp(${MYSQL_DB_HOST}:3306)/photoprism?charset=utf8mb4,utf8&parseTime=true
-      - PHOTOPRISM_DATABASE_DRIVER=mysql
-    volumes:
-      - ${PRIMARY_PARTITION}/photoprism:/photoprism/storage
-      - ${PRIMARY_PARTITION}/photoprism_raw:/photoprism/originals
-
   nginx:
     image: jc21/nginx-proxy-manager:latest
     container_name: nginx
@@ -108,60 +116,6 @@ services:
     volumes:
       - ${PRIMARY_PARTITION}/nginx/data:/data
       - ${PRIMARY_PARTITION}/nginx/letsencrypt:/etc/letsencrypt
-
-  mariadb:
-    image: mariadb:10.10
-    restart: always
-    container_name: mariadb
-    ports:
-      - 3306:3306
-    environment:
-      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
-      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
-      - MARIADB_INITDB_SKIP_TZINFO=1
-      - MYSQL_DATABASE=passbolt
-      - MYSQL_USER=passbolt
-      - MYSQL_PASSWORD=${MARIADB_PASSWORD}
-    volumes:
-      - ${PRIMARY_PARTITION}/mysql:/var/lib/mysql
-    networks:
-      - my-network
-
-#  passbolt:
-#    image: passbolt/passbolt:4.0.0-2-ce
-#    restart: always
-#    container_name: passbolt
-#    depends_on:
-#      - mariadb
-#    environment:
-#      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
-#      - SMTP_PASSWORD=${SMTP_PASSWORD}
-#      - APP_BASE=/passbolt
-#      - APP_FULL_BASE_URL=https://${DOMAIN}
-#      - EMAIL_DEFAULT_FROM_NAME=lupan
-#      - EMAIL_DEFAULT_FROM=${EMAIL}
-#      - EMAIL_TRANSPORT_DEFAULT_HOST=smtp.gmail.com
-#      - EMAIL_TRANSPORT_DEFAULT_PORT=587
-#      - EMAIL_TRANSPORT_DEFAULT_USERNAME=${EMAIL}
-#      - EMAIL_TRANSPORT_DEFAULT_PASSWORD=${SMTP_PASSWORD}
-#      - EMAIL_TRANSPORT_DEFAULT_TLS=true
-#      - PASSBOLT_KEY_NAME=lupan
-#      - PASSBOLT_KEY_EMAIL=${EMAIL}
-#      - DATASOURCES_DEFAULT_HOST=mariadb
-#      - DATASOURCES_DEFAULT_USERNAME=passbolt
-#      - DATASOURCES_DEFAULT_PASSWORD=${MARIADB_PASSWORD}
-#      - DATASOURCES_DEFAULT_DATABASE=passbolt
-#      - SECURITY_SALT=lupansecretsalt
-#      - PASSBOLT_SSL_FORCE=true
-#    volumes:
-#      - ${PRIMARY_PARTITION}/passbolt/gpg_volume:/etc/passbolt/gpg
-#      - ${PRIMARY_PARTITION}/passbolt/jwt_volume:/etc/passbolt/jwt
-#    command: ["/usr/bin/wait-for.sh", "-t", "0", "mariadb:3306", "--", "/docker-entrypoint.sh"]
-#    ports:
-#      - 8081:80
-#      - 4443:443
-#    networks:
-#      - my-network
 
   openvpn:
     image: kylemanna/openvpn
@@ -180,39 +134,6 @@ services:
     restart: always
     networks:
       - my-network
-
-#  n8n:
-#    image: docker.n8n.io/n8nio/n8n:1.0.0-rc
-#    container_name: n8n
-#    restart: always
-#    network_mode: host
-#    environment:
-#      - EMAIL=${EMAIL}
-#      - SMTP_PASSWORD=${SMTP_PASSWORD}
-#      - PRIMARY_PARTITION=${PRIMARY_PARTITION}
-#      - GENERIC_TIMEZONE=Europe/Bucharest
-#      - TZ=Europe/Bucharest
-#      - N8N_SMTP_HOST=smtp.gmail.com
-#      - N8N_SMTP_PORT=587
-#      - N8N_SMTP_USER=${EMAIL}
-#      - N8N_SMTP_PASS=${SMTP_PASSWORD}
-#      - N8N_SMTP_SENDER="N8N ${EMAIL}"
-#      - N8N_PROTOCOL=http
-#      - NODE_ENV=production
-#    volumes:
-#      - ${PRIMARY_PARTITION}/n8n:/home/node/.n8n
-
-#  rclone:
-#    image: rclone/rclone
-#    container_name: rclone
-#    restart: always
-#    privileged: true
-#    ports:
-#      - "5572:5572"
-#    volumes:
-#      - ${PRIMARY_PARTITION}/rclone:/config/rclone
-#      - /root/gcs:/data:shared
-#    command: rcd --rc-web-gui --rc-addr :5572 --rc-no-auth
 
   duplicati:
     image: lscr.io/linuxserver/duplicati:latest
@@ -299,63 +220,82 @@ services:
       - 9696:9696
     restart: unless-stopped
 
-#  immich-server:
-#    container_name: immich_server
-#    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
-#    # extends:
-#    #   file: hwaccel.transcoding.yml
-#    #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
-#    volumes:
-#      - ${PRIMARY_PARTITION}/${UPLOAD_LOCATION}:/data
-#      - /etc/localtime:/etc/localtime:ro
-#    env_file:
-#      - .env
-#    ports:
-#      - '2283:2283'
-#    depends_on:
-#      - redis
-#      - database
-#    restart: always
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - ${PRIMARY_PARTITION}/${IMMICH_UPLOAD_LOCATION}:/data
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    environment:
+      TZ: ${IMMICH_TZ:-Europe/Bucharest}
+      DB_HOSTNAME: database
+      DB_USERNAME: ${IMMICH_DB_USERNAME}
+      DB_PASSWORD: ${IMMICH_DB_PASSWORD}
+      DB_DATABASE_NAME: ${IMMICH_DB_DATABASE_NAME}
+      REDIS_HOSTNAME: redis
+    ports:
+      - '2283:2283'
+    depends_on:
+      - redis
+      - database
+    logging:
+      driver: json-file
+      options:
+        max-file: '3'
+        max-size: 10m
+    restart: always
+    healthcheck:
+      disable: false
 
-#  immich-machine-learning:
-#    container_name: immich_machine_learning
-#    # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
-#    # Example tag: ${IMMICH_VERSION:-release}-cuda
-#    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
-#    # extends: # uncomment this section for hardware acceleration - see https://docs.immich.app/features/ml-hardware-acceleration
-#    #   file: hwaccel.ml.yml
-#    #   service: cpu # set to one of [armnn, cuda, rocm, openvino, openvino-wsl, rknn] for accelerated inference - use the `-wsl` version for WSL2 where applicable
-#    volumes:
-#      - model-cache:/cache
-#    env_file:
-#      - .env
-#    restart: always
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    # ThinkCentre M920: Intel UHD → OpenVINO (set IMMICH_ML_HWACCEL in .env)
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-${IMMICH_ML_HWACCEL:-openvino}
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    environment:
+      TZ: ${IMMICH_TZ:-Europe/Bucharest}
+    logging:
+      driver: json-file
+      options:
+        max-file: '3'
+        max-size: 10m
+    restart: always
+    healthcheck:
+      disable: false
 
-#  redis:
-#    container_name: immich_redis
-#    image: docker.io/valkey/valkey:8@sha256:81db6d39e1bba3b3ff32bd3a1b19a6d69690f94a3954ec131277b9a26b95b3aa
-#    healthcheck:
-#      test: redis-cli ping || exit 1
-#    restart: always
+  redis:
+    container_name: immich_redis
+    image: docker.io/valkey/valkey:9@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d
+    healthcheck:
+      test: redis-cli ping | grep -q PONG || exit 1
+    restart: always
 
-#  database:
-#    container_name: immich_postgres
-#    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
-#    environment:
-#      POSTGRES_PASSWORD: ${DB_PASSWORD}
-#      POSTGRES_USER: ${DB_USERNAME}
-#      POSTGRES_DB: ${DB_DATABASE_NAME}
-#      POSTGRES_INITDB_ARGS: '--data-checksums'
-#    volumes:
-#      # Do not edit the next line. If you want to change the database storage location on your system, edit the value of DB_DATA_LOCATION in the .env file
-#      - ${PRIMARY_PARTITION}/${DB_DATA_LOCATION}:/var/lib/postgresql/data
-#    shm_size: 128mb
-#    restart: always
-
-#  cloudflared:
-#    image: cloudflare/cloudflared:latest
-#    restart: unless-stopped
-#    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TOKEN}
+  database:
+    container_name: immich_postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    environment:
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD}
+      POSTGRES_USER: ${IMMICH_DB_USERNAME}
+      POSTGRES_DB: ${IMMICH_DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+      DB_STORAGE_TYPE: ${IMMICH_DB_STORAGE_TYPE:-HDD}
+    volumes:
+      - ${PRIMARY_PARTITION}/${IMMICH_DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    restart: always
+    healthcheck:
+      disable: false
 
 networks:
   my-network:
@@ -363,3 +303,4 @@ networks:
 volumes:
   ovpn-data-nas:
     external: true
+  model-cache:

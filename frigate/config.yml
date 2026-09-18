@@ -1,0 +1,94 @@
+# Frigate pulls from the standalone go2rtc service (ports 8554/8555).
+# UI: http://<nas-ip>:8971  (admin password is printed in `docker logs frigate` on first start)
+# RTSP auth: compose maps GO2RTC_RTSP_* → FRIGATE_RTSP_* below.
+# MQTT left disabled; enable when you add a broker for the Home Assistant integration.
+
+mqtt:
+  enabled: false
+
+detectors:
+  ov:
+    type: openvino
+    device: GPU
+
+model:
+  width: 300
+  height: 300
+  input_tensor: nhwc
+  input_pixel_format: bgr
+  path: /openvino-model/ssdlite_mobilenet_v2.xml
+  labelmap_path: /openvino-model/coco_91cl_bkgr.txt
+
+ffmpeg:
+  hwaccel_args: preset-vaapi
+
+cameras:
+  fata:
+    ffmpeg:
+      inputs:
+        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/fata
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+            - record
+    detect:
+      enabled: true
+      fps: 5
+    record:
+      enabled: true
+
+  spate:
+    ffmpeg:
+      inputs:
+        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/spate
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+            - record
+    detect:
+      enabled: true
+      fps: 5
+    record:
+      enabled: true
+
+  sopru:
+    ffmpeg:
+      inputs:
+        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/sopru
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+            - record
+    detect:
+      enabled: true
+      fps: 5
+    record:
+      enabled: true
+
+  pod:
+    ffmpeg:
+      inputs:
+        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/pod
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+            - record
+    detect:
+      enabled: true
+      fps: 5
+    record:
+      enabled: true
+
+  terasa:
+    ffmpeg:
+      inputs:
+        - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/terasa
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+            - record
+    detect:
+      enabled: true
+      fps: 5
+    record:
+      enabled: true
