@@ -22,6 +22,24 @@ model:
 ffmpeg:
   hwaccel_args: preset-vaapi
 
+# Loop storage: keep all video for N days, then motion longer, then alerts/detections longest.
+# Frigate also auto-deletes oldest segments if the disk is nearly full.
+# Tune `continuous.days` to fit ${PRIMARY_PARTITION}/frigate/media (5 cams use a lot of space).
+record:
+  enabled: true
+  continuous:
+    days: 15
+  motion:
+    days: 15
+  alerts:
+    retain:
+      days: 30
+      mode: all
+  detections:
+    retain:
+      days: 30
+      mode: all
+
 cameras:
   fata:
     ffmpeg:
@@ -34,8 +52,6 @@ cameras:
     detect:
       enabled: true
       fps: 5
-    record:
-      enabled: true
 
   spate:
     ffmpeg:
@@ -48,8 +64,6 @@ cameras:
     detect:
       enabled: true
       fps: 5
-    record:
-      enabled: true
 
   sopru:
     ffmpeg:
@@ -62,8 +76,6 @@ cameras:
     detect:
       enabled: true
       fps: 5
-    record:
-      enabled: true
 
   pod:
     ffmpeg:
@@ -76,8 +88,6 @@ cameras:
     detect:
       enabled: true
       fps: 5
-    record:
-      enabled: true
 
   terasa:
     ffmpeg:
@@ -90,5 +100,3 @@ cameras:
     detect:
       enabled: true
       fps: 5
-    record:
-      enabled: true

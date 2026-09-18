@@ -65,7 +65,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ${PRIMARY_PARTITION}/frigate:/config
       - ./frigate/config.yml:/config/config.yml
-      - ${SECONDARY_PARTITION}/frigate:/media/frigate
+      - ${PRIMARY_PARTITION}/frigate/media:/media/frigate
       - type: tmpfs
         target: /tmp/cache
         tmpfs:

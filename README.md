@@ -58,7 +58,7 @@ Replace `HOST` with your server IP or hostname.
 
 ## Overview
 
-- **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps) and `SECONDARY_PARTITION` (media, downloads, Frigate recordings). Set both in `.env`.
+- **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps, Frigate recordings) and `SECONDARY_PARTITION` (media libraries, downloads). Set both in `.env`.
 - **Networks**:
   - **`host`**: Plex, Home Assistant, go2rtc, Nginx Proxy Manager — use the host’s ports directly.
   - **`my-network`**: Frigate, qBittorrent, OpenVPN — can resolve each other by container name.
@@ -143,7 +143,7 @@ Replace `HOST` with your server IP or hostname.
 | Ports | **8971** (authenticated UI/API) — **not** 8554/8555 (owned by go2rtc) |
 | Config DB | `${PRIMARY_PARTITION}/frigate` → `/config` |
 | Config file | [`frigate/config.yml`](frigate/config.yml) → `/config/config.yml` |
-| Media | `${SECONDARY_PARTITION}/frigate` → `/media/frigate` |
+| Media | `${PRIMARY_PARTITION}/frigate/media` → `/media/frigate` |
 | Devices | `/dev/dri` (Intel VAAPI + OpenVINO GPU) |
 | shm | `512mb` |
 
@@ -350,7 +350,7 @@ Copy [`.env.example`](.env.example) to `.env` and fill in values. Variables are 
 |----------|---------|
 | `COMPOSE_PROJECT_NAME` | Docker Compose project name (default `nas`) |
 | `PRIMARY_PARTITION` | Config, DBs, app data |
-| `SECONDARY_PARTITION` | Media libraries, downloads, Frigate recordings |
+| `SECONDARY_PARTITION` | Media libraries and downloads |
 | `DOMAIN` | Optional (OpenVPN client generation, public hostnames) |
 
 **Plex**
@@ -400,7 +400,8 @@ docker volume create ovpn-data-nas
 ${PRIMARY_PARTITION}/
 ├── plex/library/
 ├── hass/
-├── frigate/                 # Frigate DB / models (config.yml bind-mounted from repo)
+├── frigate/                 # DB / models
+│   └── media/               # recordings / clips / exports
 ├── qbt/
 ├── nginx/data/
 ├── nginx/letsencrypt/
@@ -417,8 +418,7 @@ ${SECONDARY_PARTITION}/
 ├── plex_data/tv/
 ├── plex_data/movies/
 ├── plex_data/doc/
-├── downloads/
-└── frigate/                 # recordings / clips / exports
+└── downloads/
 
 ./go2rtc/                    # go2rtc.yaml (repo)
 ./frigate/config.yml         # Frigate cameras / detectors (repo)
@@ -450,8 +450,8 @@ ${SECONDARY_PARTITION}/
 3. Create data directories (adjust paths to match `.env`):
 
    ```bash
-   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,frigate,qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
-   mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc},downloads,frigate}
+   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,frigate/media,qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
+   mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc},downloads}
    ```
 
 4. Set ownership for LinuxServer containers (if needed):
@@ -509,7 +509,8 @@ docker image prune
 **Backups**
 
 - Config and DBs: `${PRIMARY_PARTITION}` (Duplicati can backup `/source` → primary partition)
-- Large media / Frigate recordings: plan separately for `${SECONDARY_PARTITION}`
+- Large media: plan separately for `${SECONDARY_PARTITION}`
+- Frigate recordings live under `${PRIMARY_PARTITION}/frigate/media` (included in primary backups if Duplicati covers `/source`)
 - Immich Postgres: periodic dumps if not fully covered by Duplicati
 
 **Logs**
