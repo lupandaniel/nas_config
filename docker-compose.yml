@@ -58,7 +58,7 @@ services:
     container_name: frigate
     restart: unless-stopped
     stop_grace_period: 30s
-    shm_size: 512mb
+    shm_size: 768mb
     devices:
       - /dev/dri:/dev/dri
     volumes:
