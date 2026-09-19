@@ -2,25 +2,26 @@
 # UI: http://<nas-ip>:8971  (admin password is printed in `docker logs frigate` on first start)
 # RTSP auth: compose maps GO2RTC_RTSP_* → FRIGATE_RTSP_* below.
 # MQTT left disabled; enable when you add a broker for the Home Assistant integration.
+#
+# Object detection fully off (no detectors/models). Record cams: `record` role only
+# (Frigate still auto-decodes a detect stream internally — cannot be removed).
+# pod / terasa: `detect` role required for live view only.
 
 mqtt:
   enabled: false
 
-detectors:
-  ov:
-    type: openvino
-    device: GPU
+detect:
+  enabled: false
+  fps: 1
 
-model:
-  width: 300
-  height: 300
-  input_tensor: nhwc
-  input_pixel_format: bgr
-  path: /openvino-model/ssdlite_mobilenet_v2.xml
-  labelmap_path: /openvino-model/coco_91cl_bkgr.txt
+birdseye:
+  enabled: false
 
 ffmpeg:
   hwaccel_args: preset-vaapi
+  output_args:
+    # Keep camera main-stream resolution/bitrate; do not re-encode video
+    record: preset-record-generic-audio-copy
 
 record:
   enabled: true
@@ -44,10 +45,7 @@ cameras:
         - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/fata
           input_args: preset-rtsp-restream
           roles:
-            - detect
             - record
-    detect:
-      enabled: false
 
   spate:
     ffmpeg:
@@ -55,10 +53,7 @@ cameras:
         - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/spate
           input_args: preset-rtsp-restream
           roles:
-            - detect
             - record
-    detect:
-      enabled: false
 
   sopru:
     ffmpeg:
@@ -66,10 +61,7 @@ cameras:
         - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/sopru
           input_args: preset-rtsp-restream
           roles:
-            - detect
             - record
-    detect:
-      enabled: false
 
   pod:
     ffmpeg:
@@ -78,8 +70,6 @@ cameras:
           input_args: preset-rtsp-restream
           roles:
             - detect
-    detect:
-      enabled: false
     record:
       enabled: false
 
@@ -90,7 +80,5 @@ cameras:
           input_args: preset-rtsp-restream
           roles:
             - detect
-    detect:
-      enabled: false
     record:
       enabled: false

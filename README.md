@@ -135,7 +135,7 @@ Replace `HOST` with your server IP or hostname.
 ### Frigate
 
 **Image:** `ghcr.io/blakeblackshear/frigate:stable`  
-**Purpose:** NVR with object detection; cameras come from go2rtc restreams.
+**Purpose:** NVR (currently **record-only**); cameras come from go2rtc restreams.
 
 | Item | Value |
 |------|--------|
@@ -143,9 +143,10 @@ Replace `HOST` with your server IP or hostname.
 | Ports | **8971** (authenticated UI/API) — **not** 8554/8555 (owned by go2rtc) |
 | Config DB | `${PRIMARY_PARTITION}/frigate` → `/config` |
 | Config file | [`frigate/config.yml`](frigate/config.yml) → `/config/config.yml` |
-| Media | `${PRIMARY_PARTITION}/frigate_media` → `/media/frigate` |
-| Devices | `/dev/dri` (Intel VAAPI + OpenVINO GPU) |
-| shm | `512mb` |
+| Media | `${PRIMARY_PARTITION}/frigate/media` → `/media/frigate` |
+| Devices | `/dev/dri` (Intel VAAPI) |
+| shm | `256mb` (record-only; raise if re-enabling detect) |
+| `/tmp/cache` | tmpfs **256MB** |
 
 **Environment:** `TZ=Europe/Athens`; RTSP auth from `GO2RTC_RTSP_*` (mapped into Frigate as `FRIGATE_RTSP_*`).
 
@@ -154,7 +155,8 @@ Replace `HOST` with your server IP or hostname.
 **Notes:**
 
 - MQTT is disabled in config until you add a broker (needed for Home Assistant integration).
-- Uses OpenVINO on GPU and `preset-vaapi` for decode (ThinkCentre / Intel UHD style hosts).
+- Object detection is off (`detect.enabled: false`, no OpenVINO). Record cams use `record` only (Frigate still auto-decodes for UI/motion). Live-only: `pod`, `terasa`. All streams are go2rtc main; recordings use `preset-record-generic-audio-copy`.
+- After config changes: `docker compose up -d go2rtc frigate`. New recordings only reflect quality changes.
 - Do not map Frigate’s 8554/8555 while standalone go2rtc is running.
 
 ---
