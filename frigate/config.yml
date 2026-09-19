@@ -3,9 +3,9 @@
 # RTSP auth: compose maps GO2RTC_RTSP_* → FRIGATE_RTSP_* below.
 # MQTT left disabled; enable when you add a broker for the Home Assistant integration.
 #
-# Object detection fully off (no detectors/models). Record cams: `record` role only
-# (Frigate still auto-decodes a detect stream internally — cannot be removed).
-# pod / terasa: `detect` role required for live view only.
+# Object detection off (no detectors/models). Every cam still needs a `detect` role
+# for live view / decode — Frigate will not work with `record` alone.
+# pod / terasa: live view only (no record).
 
 mqtt:
   enabled: false
@@ -20,8 +20,8 @@ birdseye:
 ffmpeg:
   hwaccel_args: preset-vaapi
   output_args:
-    # Keep camera main-stream resolution/bitrate; do not re-encode video
-    record: preset-record-generic-audio-copy
+    # Cameras use pcm_alaw audio (not MP4-safe); copy video, transcode audio → AAC
+    record: preset-record-generic-audio-aac
 
 record:
   enabled: true
@@ -45,6 +45,7 @@ cameras:
         - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/fata
           input_args: preset-rtsp-restream
           roles:
+            - detect
             - record
 
   spate:
@@ -53,6 +54,7 @@ cameras:
         - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/spate
           input_args: preset-rtsp-restream
           roles:
+            - detect
             - record
 
   sopru:
@@ -61,6 +63,7 @@ cameras:
         - path: rtsp://{FRIGATE_RTSP_USER}:{FRIGATE_RTSP_PASSWORD}@host.docker.internal:8554/sopru
           input_args: preset-rtsp-restream
           roles:
+            - detect
             - record
 
   pod:

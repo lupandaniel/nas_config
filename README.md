@@ -155,7 +155,7 @@ Replace `HOST` with your server IP or hostname.
 **Notes:**
 
 - MQTT is disabled in config until you add a broker (needed for Home Assistant integration).
-- Object detection is off (`detect.enabled: false`, no OpenVINO). Record cams use `record` only (Frigate still auto-decodes for UI/motion). Live-only: `pod`, `terasa`. All streams are go2rtc main; recordings use `preset-record-generic-audio-copy`.
+- Object detection is off (`detect.enabled: false`, no OpenVINO). Record cams use `detect` + `record` on main (detect role required for live view). Live-only: `pod`, `terasa`. Recordings copy video and transcode audio to AAC (`preset-record-generic-audio-aac`) because cameras output `pcm_alaw`.
 - After config changes: `docker compose up -d go2rtc frigate`. New recordings only reflect quality changes.
 - Do not map Frigate’s 8554/8555 while standalone go2rtc is running.
 
