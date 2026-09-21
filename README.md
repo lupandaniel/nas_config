@@ -155,8 +155,8 @@ Replace `HOST` with your server IP or hostname.
 **Notes:**
 
 - MQTT is disabled in config until you add a broker (needed for Home Assistant integration).
-- Object detection is off (`detect.enabled: false`). VAAPI hwaccel disabled (was crash-looping ffmpeg → RAM leak). Record uses `preset-record-generic-audio-aac` for `pcm_alaw` cameras. `shm_size: 512mb`.
-- Deploy from this repo on the NAS, then: `docker compose up -d --force-recreate go2rtc frigate`. Confirm a new container id; PIDs should stay in the tens once ffmpeg stops crash-looping.
+- Object detection is off (`detect.enabled: false`). Intel QSV hwaccel for decode (`preset-intel-qsv`); record uses `preset-record-generic-audio-aac` for `pcm_alaw`. `shm_size: 512mb`.
+- Deploy: `docker compose up -d --force-recreate frigate`. Watch CPU drop; if `hwdownload` / sync-surface errors return (RAM/PIDs climb), say so — next step is usually easing GPU contention with Immich ML.
 - Do not map Frigate’s 8554/8555 while standalone go2rtc is running.
 
 ---
