@@ -51,17 +51,14 @@ services:
     volumes:
       - ./go2rtc:/config
 
-  # NVR (record-only); cameras come from standalone go2rtc (do not map 8554/8555 here).
+  # NVR (object detect off); cameras from standalone go2rtc (do not map 8554/8555).
   # UI: http://<nas-ip>:8971
-  # shm/tmpfs sized for record-only — raise again if re-enabling detect.
   frigate:
     image: ghcr.io/blakeblackshear/frigate:stable
     container_name: frigate
     restart: unless-stopped
     stop_grace_period: 30s
-    shm_size: 256mb
-    devices:
-      - /dev/dri:/dev/dri
+    shm_size: 512mb
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${PRIMARY_PARTITION}/frigate:/config
@@ -71,13 +68,18 @@ services:
       - type: tmpfs
         target: /tmp/cache
         tmpfs:
-          size: 268435456
+          size: 512000000
     ports:
       - "8971:8971"
     environment:
       TZ: Europe/Athens
       FRIGATE_RTSP_USER: ${GO2RTC_RTSP_USERNAME}
       FRIGATE_RTSP_PASSWORD: ${GO2RTC_RTSP_PASSWORD}
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

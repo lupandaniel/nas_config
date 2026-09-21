@@ -1,6 +1,10 @@
 # Secrets live in .env — see .env.example (GO2RTC_* vars)
 # WebUI: http://<nas-ip>:1984
 # Restream: rtsp://<nas-ip>:8554/<stream_name>
+#
+# Plain main RTSP only. Frigate transcodes pcm_alaw → AAC on record
+# (preset-record-generic-audio-aac). Avoid go2rtc ffmpeg#audio here — it
+# caused Non-monotonic DTS / unstable restreams under Frigate.
 
 api:
   listen: ":1984"
@@ -18,7 +22,6 @@ webrtc:
   - 192.168.0.105:8555
 
 streams:
-  # Add one key per camera; only list cameras you have set in .env
   fata: ${FATA_URL}
   spate: ${SPATE_URL}
   sopru: ${SOPRU_URL}

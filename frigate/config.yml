@@ -18,7 +18,8 @@ birdseye:
   enabled: false
 
 ffmpeg:
-  hwaccel_args: preset-vaapi
+  # VAAPI was crashing ffmpeg (Failed to sync surface / hwdownload -5) → restart
+  # loops leaked RAM (hundreds of PIDs). Software decode until GPU path is stable.
   output_args:
     # Cameras use pcm_alaw audio (not MP4-safe); copy video, transcode audio → AAC
     record: preset-record-generic-audio-aac
