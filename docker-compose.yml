@@ -51,33 +51,29 @@ services:
     volumes:
       - ./go2rtc:/config
 
-  # NVR (object detect off); cameras from standalone go2rtc (do not map 8554/8555).
-  # UI: http://<nas-ip>:8971
-  frigate:
-    image: ghcr.io/blakeblackshear/frigate:stable
-    container_name: frigate
+  # NVR: Agent DVR. Point cameras at go2rtc restreams (rtsp://host:8554/<name>)
+  # or directly at camera URLs. UI: http://<nas-ip>:8090
+  agentdvr:
+    image: ispysoftware/agentdvr:latest
+    container_name: agentdvr
     restart: unless-stopped
-    stop_grace_period: 30s
-    shm_size: 512mb
-    devices:
-      - /dev/dri:/dev/dri
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - ${PRIMARY_PARTITION}/frigate:/config
-      - ./frigate/config.yml:/config/config.yml
-      # Recordings must live on primary (not nested under /config mount)
-      - ${PRIMARY_PARTITION}/frigate/media:/media/frigate
-      - type: tmpfs
-        target: /tmp/cache
-        tmpfs:
-          size: 512000000
-    ports:
-      - "8971:8971"
     environment:
-      TZ: Europe/Athens
-      FRIGATE_RTSP_USER: ${GO2RTC_RTSP_USERNAME}
-      FRIGATE_RTSP_PASSWORD: ${GO2RTC_RTSP_PASSWORD}
-      LIBVA_DRIVER_NAME: iHD
+      - PUID=1000
+      - PGID=1000
+      - AGENTDVR_WEBUI_PORT=8090
+      - TZ=Europe/Athens
+    volumes:
+      - ${PRIMARY_PARTITION}/agentdvr/config:/AgentDVR/Media/XML
+      - ${PRIMARY_PARTITION}/agentdvr/media:/AgentDVR/Media/WebServerRoot/Media
+      - ${PRIMARY_PARTITION}/agentdvr/models:/AgentDVR/Media/Models
+      - ${PRIMARY_PARTITION}/agentdvr/commands:/AgentDVR/Commands
+    ports:
+      - "8090:8090"
+      - "3478:3478/udp"
+      - "50000-50100:50000-50100/udp"
+    devices:
+      # Intel iGPU; drop card0 if it does not exist on the host
+      - /dev/dri/renderD128:/dev/dri/renderD128
     logging:
       driver: json-file
       options:

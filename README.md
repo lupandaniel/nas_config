@@ -24,7 +24,9 @@ Replace `HOST` with your server IP or hostname.
 | Nginx Proxy Manager | 80 | TCP | host | HTTP (proxied sites) |
 | Nginx Proxy Manager | 443 | TCP | host | HTTPS (proxied sites) |
 | Nginx Proxy Manager | 81 | TCP | host | Admin UI |
-| Frigate | 8971 | TCP | `8971:8971` | Authenticated Web UI / API |
+| Agent DVR | 8090 | TCP | `8090:8090` | Web UI |
+| Agent DVR | 3478 | UDP | `3478:3478` | TURN / WebRTC setup |
+| Agent DVR | 50000–50100 | UDP | `50000-50100:50000-50100` | WebRTC media |
 | qBittorrent | 8080 | TCP | `8080:8080` | Web UI |
 | qBittorrent | 6881 | TCP | `6881:6881` | BitTorrent peers |
 | qBittorrent | 6881 | UDP | `6881:6881` | BitTorrent peers |
@@ -43,7 +45,7 @@ Replace `HOST` with your server IP or hostname.
 | Plex | `http://HOST:32400/web` |
 | Home Assistant | `http://HOST:8123` |
 | go2rtc | `http://HOST:1984` |
-| Frigate | `http://HOST:8971` |
+| Agent DVR | `http://HOST:8090` |
 | Nginx Proxy Manager | `http://HOST:81` |
 | qBittorrent | `http://HOST:8080` |
 | Duplicati | `http://HOST:8200` |
@@ -58,13 +60,13 @@ Replace `HOST` with your server IP or hostname.
 
 ## Overview
 
-- **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps, Frigate recordings) and `SECONDARY_PARTITION` (media libraries, downloads). Set both in `.env`.
+- **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps, Agent DVR recordings) and `SECONDARY_PARTITION` (media libraries, downloads). Set both in `.env`.
 - **Networks**:
   - **`host`**: Plex, Home Assistant, go2rtc, Nginx Proxy Manager — use the host’s ports directly.
-  - **`my-network`**: Frigate, qBittorrent, OpenVPN — can resolve each other by container name.
+  - **`my-network`**: Agent DVR, qBittorrent, OpenVPN — can resolve each other by container name.
   - **Default project bridge**: Duplicati, Radarr, Sonarr, Seerr, Prowlarr, Immich (+ Valkey/Postgres) — published ports only; not on `my-network`.
-- **Cameras**: go2rtc owns camera connections and restreams on **8554** / **8555**. Frigate consumes those restreams (does not publish 8554/8555).
-- **Restart**: Most services use `restart: always`; Frigate, Duplicati, Radarr, Sonarr, Seerr, and Prowlarr use `restart: unless-stopped`.
+- **Cameras**: go2rtc owns camera connections and restreams on **8554** / **8555**. Agent DVR should ingest those restreams (or camera URLs directly).
+- **Restart**: Most services use `restart: always`; Agent DVR, Duplicati, Radarr, Sonarr, Seerr, and Prowlarr use `restart: unless-stopped`.
 
 ---
 
@@ -109,14 +111,14 @@ Replace `HOST` with your server IP or hostname.
 
 **Access:** `http://HOST:8123`
 
-**Notes:** Runs **privileged** for hardware access. Adjust `devices` if your USB serial path differs. For Frigate automations, add an MQTT broker and enable MQTT in Frigate + the [Frigate HA integration](https://docs.frigate.video/integrations/home-assistant/).
+**Notes:** Runs **privileged** for hardware access. Adjust `devices` if your USB serial path differs. Agent DVR has a [Home Assistant integration](https://www.ispyconnect.com/docs/agent/about).
 
 ---
 
 ### go2rtc
 
 **Image:** `alexxit/go2rtc`  
-**Purpose:** Camera ingest and restream (RTSP/WebRTC) for Home Assistant, Frigate, and browsers.
+**Purpose:** Camera ingest and restream (RTSP/WebRTC) for Home Assistant, Agent DVR, and browsers.
 
 | Item | Value |
 |------|--------|
@@ -132,32 +134,31 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
-### Frigate
+### Agent DVR
 
-**Image:** `ghcr.io/blakeblackshear/frigate:stable`  
-**Purpose:** NVR (currently **record-only**); cameras come from go2rtc restreams.
+**Image:** `ispysoftware/agentdvr:latest`  
+**Purpose:** NVR with live view, continuous/motion recording, optional AI; cameras via go2rtc or direct RTSP.
 
 | Item | Value |
 |------|--------|
 | Network | `my-network` (+ `host.docker.internal` → host gateway) |
-| Ports | **8971** (authenticated UI/API) — **not** 8554/8555 (owned by go2rtc) |
-| Config DB | `${PRIMARY_PARTITION}/frigate` → `/config` |
-| Config file | [`frigate/config.yml`](frigate/config.yml) → `/config/config.yml` |
-| Media | `${PRIMARY_PARTITION}/frigate/media` → `/media/frigate` |
-| Devices | `/dev/dri` (Intel VAAPI) |
-| shm | `256mb` (record-only; raise if re-enabling detect) |
-| `/tmp/cache` | tmpfs **256MB** |
+| Ports | **8090** (web UI), **3478/udp** (TURN), **50000–50100/udp** (WebRTC) |
+| Config | `${PRIMARY_PARTITION}/agentdvr/config` → `/AgentDVR/Media/XML` |
+| Media | `${PRIMARY_PARTITION}/agentdvr/media` → `/AgentDVR/Media/WebServerRoot/Media` |
+| Models | `${PRIMARY_PARTITION}/agentdvr/models` → `/AgentDVR/Media/Models` |
+| Commands | `${PRIMARY_PARTITION}/agentdvr/commands` → `/AgentDVR/Commands` |
+| Devices | `/dev/dri/renderD128` (Intel iGPU encode/decode) |
 
-**Environment:** `TZ=Europe/Athens`; RTSP auth from `GO2RTC_RTSP_*` (mapped into Frigate as `FRIGATE_RTSP_*`).
+**Environment:** `PUID=1000`, `PGID=1000`, `TZ=Europe/Athens`, `AGENTDVR_WEBUI_PORT=8090`
 
-**Access:** `http://HOST:8971` — on first start, admin password is printed in `docker logs frigate`.
+**Access:** `http://HOST:8090`
 
 **Notes:**
 
-- MQTT is disabled in config until you add a broker (needed for Home Assistant integration).
-- Object detection is off (`detect.enabled: false`). Intel QSV hwaccel for decode (`preset-intel-qsv`); record uses `preset-record-generic-audio-aac` for `pcm_alaw`. `shm_size: 512mb`.
-- Deploy: `docker compose up -d --force-recreate frigate`. Watch CPU drop; if `hwdownload` / sync-surface errors return (RAM/PIDs climb), say so — next step is usually easing GPU contention with Immich ML.
-- Do not map Frigate’s 8554/8555 while standalone go2rtc is running.
+- Add cameras in the UI. Prefer go2rtc restreams: `rtsp://GO2RTC_RTSP_USER:PASS@host.docker.internal:8554/fata` (and `spate`, `sopru`, `pod`, `terasa`) so each camera has a single upstream connection.
+- Local use is free; remote access / some AI features need an [iSpyConnect](https://www.ispyconnect.com/) subscription.
+- Replace Frigate: `docker compose stop frigate && docker compose rm -f frigate && docker compose up -d agentdvr`
+- If GPU decode fails, remove the `devices:` block and use software decode in Agent DVR settings.
 
 ---
 
@@ -194,7 +195,7 @@ Replace `HOST` with your server IP or hostname.
 
 **Access:** `http://HOST:81` — default login `admin@example.com` / `changeme` (change immediately).
 
-**Notes:** Point public DNS at this host and create proxy hosts in the UI for services you want on HTTPS (e.g. Seerr, Frigate, Immich).
+**Notes:** Point public DNS at this host and create proxy hosts in the UI for services you want on HTTPS (e.g. Seerr, Agent DVR, Immich).
 
 ---
 
@@ -366,7 +367,7 @@ Copy [`.env.example`](.env.example) to `.env` and fill in values. Variables are 
 | Variable | Purpose |
 |----------|---------|
 | `GO2RTC_API_USERNAME` / `GO2RTC_API_PASSWORD` | Web UI / API auth |
-| `GO2RTC_RTSP_USERNAME` / `GO2RTC_RTSP_PASSWORD` | RTSP restream auth (also used by Frigate) |
+| `GO2RTC_RTSP_USERNAME` / `GO2RTC_RTSP_PASSWORD` | RTSP restream auth (Agent DVR / HA / other clients) |
 | `FATA_URL`, `SPATE_URL`, `SOPRU_URL`, `POD_URL`, `TERASA_URL` | Camera RTSP source URLs |
 
 **Duplicati**
@@ -402,8 +403,8 @@ docker volume create ovpn-data-nas
 ${PRIMARY_PARTITION}/
 ├── plex/library/
 ├── hass/
-├── frigate/                 # DB / models
-├── frigate_media/           # recordings / clips / exports
+├── agentdvr/                # config / models / commands
+├── agentdvr/media/          # recordings (or nested under agentdvr/)
 ├── qbt/
 ├── nginx/data/
 ├── nginx/letsencrypt/
@@ -423,7 +424,6 @@ ${SECONDARY_PARTITION}/
 └── downloads/
 
 ./go2rtc/                    # go2rtc.yaml (repo)
-./frigate/config.yml         # Frigate cameras / detectors (repo)
 ```
 
 ---
@@ -436,7 +436,7 @@ ${SECONDARY_PARTITION}/
 - Disk space on primary and secondary paths
 - UID/GID **1000** for LinuxServer images (or change `PUID`/`PGID` in compose)
 - For OpenVPN: kernel TUN (`/dev/net/tun`) and external volume `ovpn-data-nas`
-- For Frigate / Immich ML on Intel: `/dev/dri` available on the host
+- For Agent DVR / Immich ML on Intel: `/dev/dri` available on the host
 
 ### Steps
 
@@ -452,7 +452,7 @@ ${SECONDARY_PARTITION}/
 3. Create data directories (adjust paths to match `.env`):
 
    ```bash
-   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,frigate,frigate_media,qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
+   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,agentdvr/{config,media,models,commands},qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
    mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc},downloads}
    ```
 
@@ -476,7 +476,7 @@ ${SECONDARY_PARTITION}/
    docker compose logs -f SERVICE_NAME
    ```
 
-7. Frigate first login: `docker logs frigate` for the generated admin password, then open `http://HOST:8971`.
+7. Agent DVR: open `http://HOST:8090`, add cameras from go2rtc (`rtsp://…@host.docker.internal:8554/<name>`).
 
 ---
 
@@ -512,7 +512,7 @@ docker image prune
 
 - Config and DBs: `${PRIMARY_PARTITION}` (Duplicati can backup `/source` → primary partition)
 - Large media: plan separately for `${SECONDARY_PARTITION}`
-- Frigate recordings live under `${PRIMARY_PARTITION}/frigate_media` (included in primary backups if Duplicati covers `/source`)
+- Agent DVR recordings live under `${PRIMARY_PARTITION}/agentdvr/media` (included in primary backups if Duplicati covers `/source`)
 - Immich Postgres: periodic dumps if not fully covered by Duplicati
 
 **Logs**
@@ -528,7 +528,7 @@ docker compose up -d --force-recreate SERVICE_NAME
 
 ## Security
 
-1. Change default passwords (qBittorrent, Nginx Proxy Manager, Duplicati, Frigate admin).
+1. Change default passwords (qBittorrent, Nginx Proxy Manager, Duplicati, Agent DVR).
 2. Prefer HTTPS via Nginx Proxy Manager for web UIs accessed remotely.
 3. Restrict host firewall to needed ports; VPN for admin access is preferable to wide port forwarding.
 4. Keep images updated (`docker compose pull`).
@@ -546,8 +546,8 @@ docker compose up -d --force-recreate SERVICE_NAME
 | *arr / Seerr cannot reach qBittorrent | Use host IP and port **8080**, not container name (different networks) |
 | Plex not visible | Claim with fresh `PLEX_CLAIM`; host networking and firewall on **32400** |
 | OpenVPN fails to start | `ovpn-data-nas` exists; `/dev/net/tun`; `NET_ADMIN` |
-| Frigate cameras offline | go2rtc up; `GO2RTC_RTSP_*` set; stream names in `frigate/config.yml` |
-| Frigate / Immich GPU errors | `/dev/dri` present; OpenVINO/VAAPI supported on the CPU/iGPU |
+| Agent DVR cameras offline | go2rtc up; `GO2RTC_RTSP_*` set; use `host.docker.internal:8554/<stream>` |
+| Agent DVR / Immich GPU errors | `/dev/dri/renderD128` present; try without `card0` if missing |
 | Immich won't start | `IMMICH_DB_PASSWORD` set; Postgres path writable |
 
 ---

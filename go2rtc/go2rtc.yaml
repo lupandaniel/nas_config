@@ -2,9 +2,7 @@
 # WebUI: http://<nas-ip>:1984
 # Restream: rtsp://<nas-ip>:8554/<stream_name>
 #
-# Plain main RTSP only. Frigate transcodes pcm_alaw → AAC on record
-# (preset-record-generic-audio-aac). Avoid go2rtc ffmpeg#audio here — it
-# caused Non-monotonic DTS / unstable restreams under Frigate.
+# Agent DVR / HA should prefer these restreams so each camera has one upstream.
 
 api:
   listen: ":1984"
