@@ -76,11 +76,12 @@ services:
     volumes:
       - ./go2rtc:/config
 
-  # NVR: Agent DVR. Point cameras at go2rtc restreams (rtsp://host:8554/<name>)
+  # NVR: Agent DVR. Point cameras at go2rtc restreams (rtsp://127.0.0.1:8554/<name>)
   # or directly at camera URLs. UI: http://<nas-ip>:8090
   agentdvr:
     image: ispysoftware/agentdvr:latest
     container_name: agentdvr
+    network_mode: host
     restart: unless-stopped
     environment:
       - PUID=1000
@@ -92,10 +93,6 @@ services:
       - ${PRIMARY_PARTITION}/agentdvr/media:/AgentDVR/Media/WebServerRoot/Media
       - ${PRIMARY_PARTITION}/agentdvr/models:/AgentDVR/Media/Models
       - ${PRIMARY_PARTITION}/agentdvr/commands:/AgentDVR/Commands
-    ports:
-      - "8090:8090"
-      - "3478:3478/udp"
-      - "50000-50100:50000-50100/udp"
     devices:
       # Intel iGPU; drop card0 if it does not exist on the host
       - /dev/dri/renderD128:/dev/dri/renderD128
@@ -104,10 +101,6 @@ services:
       options:
         max-file: "3"
         max-size: 10m
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - my-network
 
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest

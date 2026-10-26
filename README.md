@@ -6,7 +6,7 @@ Docker Compose stack for media streaming, downloads, photo management, home auto
 
 Replace `HOST` with your server IP or hostname.
 
-**Host network** (`plex`, `hass`, `go2rtc`, `nginx`): ports bind on the machine directly — nothing is listed under `ports:` in compose; defaults below are what each app uses.
+**Host network** (`plex`, `hass`, `go2rtc`, `nginx`, `agentdvr`): ports bind on the machine directly — nothing is listed under `ports:` in compose; defaults below are what each app uses.
 
 **Published ports** (everything else): `host:container` mappings from compose.
 
@@ -26,9 +26,9 @@ Replace `HOST` with your server IP or hostname.
 | Nginx Proxy Manager | 80          | TCP      | host                      | HTTP (proxied sites)       |
 | Nginx Proxy Manager | 443         | TCP      | host                      | HTTPS (proxied sites)      |
 | Nginx Proxy Manager | 81          | TCP      | host                      | Admin UI                   |
-| Agent DVR           | 8090        | TCP      | `8090:8090`               | Web UI                     |
-| Agent DVR           | 3478        | UDP      | `3478:3478`               | TURN / WebRTC setup        |
-| Agent DVR           | 50000–50100 | UDP      | `50000-50100:50000-50100` | WebRTC media               |
+| Agent DVR           | 8090        | TCP      | host                      | Web UI                     |
+| Agent DVR           | 3478        | UDP      | host                      | TURN / WebRTC setup        |
+| Agent DVR           | 50000–50100 | UDP      | host                      | WebRTC media               |
 | qBittorrent         | 8080        | TCP      | `8080:8080`               | Web UI                     |
 | qBittorrent         | 6881        | TCP      | `6881:6881`               | BitTorrent peers           |
 | qBittorrent         | 6881        | UDP      | `6881:6881`               | BitTorrent peers           |
@@ -72,8 +72,8 @@ Replace `HOST` with your server IP or hostname.
 
 - **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps, Agent DVR recordings) and `SECONDARY_PARTITION` (media libraries, downloads). Set both in `.env`.
 - **Networks**:
-  - `host`: Plex, Home Assistant, go2rtc, Nginx Proxy Manager — use the host’s ports directly.
-  - `my-network`: Agent DVR, qBittorrent, OpenVPN — can resolve each other by container name.
+  - `host`: Plex, Home Assistant, go2rtc, Agent DVR, Nginx Proxy Manager — use the host’s ports directly.
+  - `my-network`: qBittorrent, OpenVPN — can resolve each other by container name.
   - **Default project bridge**: NUT, Duplicati, Radarr, Sonarr, Seerr, Prowlarr, Immich (+ Valkey/Postgres) — published ports only; not on `my-network`.
 - **Cameras**: go2rtc owns camera connections and restreams on **8554** / **8555**. Agent DVR should ingest those restreams (or camera URLs directly).
 - **UPS**: `nut-upsd` talks to the nJoy Code 800 over USB (`nutdrv_qx`) and serves NUT on **3493** for Home Assistant and other clients.
@@ -203,8 +203,8 @@ Replace `HOST` with your server IP or hostname.
 
 | Item     | Value                                                                         |
 | -------- | ----------------------------------------------------------------------------- |
-| Network  | `my-network` (+ `host.docker.internal` → host gateway)                        |
-| Ports    | **8090** (web UI), **3478/udp** (TURN), **50000–50100/udp** (WebRTC)          |
+| Network  | `host`                                                                        |
+| Ports    | **8090** (web UI), **3478/udp** (TURN), **50000–50100/udp** (WebRTC) on host  |
 | Config   | `${PRIMARY_PARTITION}/agentdvr/config` → `/AgentDVR/Media/XML`                |
 | Media    | `${PRIMARY_PARTITION}/agentdvr/media` → `/AgentDVR/Media/WebServerRoot/Media` |
 | Models   | `${PRIMARY_PARTITION}/agentdvr/models` → `/AgentDVR/Media/Models`             |
@@ -218,7 +218,7 @@ Replace `HOST` with your server IP or hostname.
 
 **Notes:**
 
-- Add cameras in the UI. Prefer go2rtc restreams: `rtsp://GO2RTC_RTSP_USER:PASS@host.docker.internal:8554/fata` (and `spate`, `sopru`, `pod`, `terasa`) so each camera has a single upstream connection.
+- Add cameras in the UI. Prefer go2rtc restreams: `rtsp://GO2RTC_RTSP_USER:PASS@127.0.0.1:8554/fata` (and `spate`, `sopru`, `pod`, `terasa`) so each camera has a single upstream connection. With host networking, `127.0.0.1` reaches go2rtc on the same machine.
 - Local use is free; remote access / some AI features need an [iSpyConnect](https://www.ispyconnect.com/) subscription.
 - Replace Frigate: `docker compose stop frigate && docker compose rm -f frigate && docker compose up -d agentdvr`
 - If GPU decode fails, remove the `devices:` block and use software decode in Agent DVR settings.
@@ -598,7 +598,7 @@ ${SECONDARY_PARTITION}/
    docker compose ps
    docker compose logs -f SERVICE_NAME
   ```
-7. Agent DVR: open `http://HOST:8090`, add cameras from go2rtc (`rtsp://…@host.docker.internal:8554/<name>`).
+7. Agent DVR: open `http://HOST:8090`, add cameras from go2rtc (`rtsp://…@127.0.0.1:8554/<name>`).
 
 ---
 
@@ -678,7 +678,7 @@ docker compose up -d --force-recreate SERVICE_NAME
 | *arr / Seerr cannot reach qBittorrent | Use host IP and port **8080**, not container name (different networks)   |
 | Plex not visible                      | Claim with fresh `PLEX_CLAIM`; host networking and firewall on **32400** |
 | OpenVPN fails to start                | `ovpn-data-nas` exists; `/dev/net/tun`; `NET_ADMIN`                      |
-| Agent DVR cameras offline             | go2rtc up; `GO2RTC_RTSP_*` set; use `host.docker.internal:8554/<stream>` |
+| Agent DVR cameras offline             | go2rtc up; `GO2RTC_RTSP_*` set; use `127.0.0.1:8554/<stream>` (host net) |
 | Agent DVR / Immich GPU errors         | `/dev/dri/renderD128` present; try without `card0` if missing            |
 | Immich won't start                    | `IMMICH_DB_PASSWORD` set; Postgres path writable                         |
 | NUT / UPS not detected                | USB plugged in; `lsusb` (often `0665:5161`); `NUT_API_PASSWORD` set; wait ~1 min for `nutdrv_qx` probe; check `docker compose logs nut-upsd` |
