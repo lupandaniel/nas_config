@@ -1,6 +1,6 @@
 # Home Server Setup
 
-Docker Compose stack for media streaming, downloads, photo management, home automation, camera restreaming/NVR, reverse proxy, backups, and VPN access. All services are defined in [`docker-compose.yml`](docker-compose.yml).
+Docker Compose stack for media streaming, downloads, photo management, home automation, UPS monitoring (NUT), camera restreaming/NVR, reverse proxy, backups, and VPN access. All services are defined in `[docker-compose.yml](docker-compose.yml)`.
 
 ## Application ports
 
@@ -12,79 +12,96 @@ Replace `HOST` with your server IP or hostname.
 
 ### Active services
 
-| App | Port | Protocol | Mapping | Purpose |
-|-----|------|----------|---------|---------|
-| Plex | 32400 | TCP | host | Web UI / API |
-| Plex | 32469 | UDP | host | DLNA (if enabled in Plex) |
-| Plex | 32443 | TCP | host | HTTPS (if enabled in Plex) |
-| Home Assistant | 8123 | TCP | host | Web UI |
-| go2rtc | 1984 | TCP | host | Web UI / API |
-| go2rtc | 8554 | TCP | host | RTSP restream |
-| go2rtc | 8555 | TCP/UDP | host | WebRTC |
-| Nginx Proxy Manager | 80 | TCP | host | HTTP (proxied sites) |
-| Nginx Proxy Manager | 443 | TCP | host | HTTPS (proxied sites) |
-| Nginx Proxy Manager | 81 | TCP | host | Admin UI |
-| Agent DVR | 8090 | TCP | `8090:8090` | Web UI |
-| Agent DVR | 3478 | UDP | `3478:3478` | TURN / WebRTC setup |
-| Agent DVR | 50000–50100 | UDP | `50000-50100:50000-50100` | WebRTC media |
-| qBittorrent | 8080 | TCP | `8080:8080` | Web UI |
-| qBittorrent | 6881 | TCP | `6881:6881` | BitTorrent peers |
-| qBittorrent | 6881 | UDP | `6881:6881` | BitTorrent peers |
-| OpenVPN | 1194 | UDP | `1194:1194` | VPN tunnel |
-| Duplicati | 8200 | TCP | `8200:8200` | Web UI |
-| Radarr | 7878 | TCP | `7878:7878` | Web UI |
-| Sonarr | 8989 | TCP | `8989:8989` | Web UI |
-| Seerr | 5055 | TCP | `5055:5055` | Web UI |
-| Prowlarr | 9696 | TCP | `9696:9696` | Web UI |
-| Immich | 2283 | TCP | `2283:2283` | Web UI / API |
+
+| App                 | Port        | Protocol | Mapping                   | Purpose                    |
+| ------------------- | ----------- | -------- | ------------------------- | -------------------------- |
+| Plex                | 32400       | TCP      | host                      | Web UI / API               |
+| Plex                | 32469       | UDP      | host                      | DLNA (if enabled in Plex)  |
+| Plex                | 32443       | TCP      | host                      | HTTPS (if enabled in Plex) |
+| Home Assistant      | 8123        | TCP      | host                      | Web UI                     |
+| NUT (nut-upsd)      | 3493        | TCP      | `3493:3493`               | UPS status (nJoy Code 800) |
+| go2rtc              | 1984        | TCP      | host                      | Web UI / API               |
+| go2rtc              | 8554        | TCP      | host                      | RTSP restream              |
+| go2rtc              | 8555        | TCP/UDP  | host                      | WebRTC                     |
+| Nginx Proxy Manager | 80          | TCP      | host                      | HTTP (proxied sites)       |
+| Nginx Proxy Manager | 443         | TCP      | host                      | HTTPS (proxied sites)      |
+| Nginx Proxy Manager | 81          | TCP      | host                      | Admin UI                   |
+| Agent DVR           | 8090        | TCP      | `8090:8090`               | Web UI                     |
+| Agent DVR           | 3478        | UDP      | `3478:3478`               | TURN / WebRTC setup        |
+| Agent DVR           | 50000–50100 | UDP      | `50000-50100:50000-50100` | WebRTC media               |
+| qBittorrent         | 8080        | TCP      | `8080:8080`               | Web UI                     |
+| qBittorrent         | 6881        | TCP      | `6881:6881`               | BitTorrent peers           |
+| qBittorrent         | 6881        | UDP      | `6881:6881`               | BitTorrent peers           |
+| OpenVPN             | 1194        | UDP      | `1194:1194`               | VPN tunnel                 |
+| Duplicati           | 8200        | TCP      | `8200:8200`               | Web UI                     |
+| Radarr              | 7878        | TCP      | `7878:7878`               | Web UI                     |
+| Sonarr              | 8989        | TCP      | `8989:8989`               | Web UI                     |
+| Seerr               | 5055        | TCP      | `5055:5055`               | Web UI                     |
+| Prowlarr            | 9696        | TCP      | `9696:9696`               | Web UI                     |
+| Immich              | 2283        | TCP      | `2283:2283`               | Web UI / API               |
+
+
+
 
 ### Quick access URLs (active)
 
-| App | URL |
-|-----|-----|
-| Plex | `http://HOST:32400/web` |
-| Home Assistant | `http://HOST:8123` |
-| go2rtc | `http://HOST:1984` |
-| Agent DVR | `http://HOST:8090` |
-| Nginx Proxy Manager | `http://HOST:81` |
-| qBittorrent | `http://HOST:8080` |
-| Duplicati | `http://HOST:8200` |
-| Radarr | `http://HOST:7878` |
-| Sonarr | `http://HOST:8989` |
-| Seerr | `http://HOST:5055` |
-| Prowlarr | `http://HOST:9696` |
-| Immich | `http://HOST:2283` |
-| OpenVPN | UDP `HOST:1194` (client `.ovpn` file) |
+
+| App                 | URL                                   |
+| ------------------- | ------------------------------------- |
+| Plex                | `http://HOST:32400/web`               |
+| Home Assistant      | `http://HOST:8123`                    |
+| NUT                 | TCP `HOST:3493` (UPS name `njoy`)     |
+| go2rtc              | `http://HOST:1984`                    |
+| Agent DVR           | `http://HOST:8090`                    |
+| Nginx Proxy Manager | `http://HOST:81`                      |
+| qBittorrent         | `http://HOST:8080`                    |
+| Duplicati           | `http://HOST:8200`                    |
+| Radarr              | `http://HOST:7878`                    |
+| Sonarr              | `http://HOST:8989`                    |
+| Seerr               | `http://HOST:5055`                    |
+| Prowlarr            | `http://HOST:9696`                    |
+| Immich              | `http://HOST:2283`                    |
+| OpenVPN             | UDP `HOST:1194` (client `.ovpn` file) |
+
 
 ---
+
+
 
 ## Overview
 
 - **Storage**: Bind mounts under `PRIMARY_PARTITION` (config, DBs, apps, Agent DVR recordings) and `SECONDARY_PARTITION` (media libraries, downloads). Set both in `.env`.
 - **Networks**:
-  - **`host`**: Plex, Home Assistant, go2rtc, Nginx Proxy Manager — use the host’s ports directly.
-  - **`my-network`**: Agent DVR, qBittorrent, OpenVPN — can resolve each other by container name.
-  - **Default project bridge**: Duplicati, Radarr, Sonarr, Seerr, Prowlarr, Immich (+ Valkey/Postgres) — published ports only; not on `my-network`.
+  - `host`: Plex, Home Assistant, go2rtc, Nginx Proxy Manager — use the host’s ports directly.
+  - `my-network`: Agent DVR, qBittorrent, OpenVPN — can resolve each other by container name.
+  - **Default project bridge**: NUT, Duplicati, Radarr, Sonarr, Seerr, Prowlarr, Immich (+ Valkey/Postgres) — published ports only; not on `my-network`.
 - **Cameras**: go2rtc owns camera connections and restreams on **8554** / **8555**. Agent DVR should ingest those restreams (or camera URLs directly).
-- **Restart**: Most services use `restart: always`; Agent DVR, Duplicati, Radarr, Sonarr, Seerr, and Prowlarr use `restart: unless-stopped`.
+- **UPS**: `nut-upsd` talks to the nJoy Code 800 over USB (`nutdrv_qx`) and serves NUT on **3493** for Home Assistant and other clients.
+- **Restart**: Most services use `restart: always`; Agent DVR, NUT, Duplicati, Radarr, Sonarr, Seerr, and Prowlarr use `restart: unless-stopped`.
 
 ---
 
+
+
 ## Active services
+
+
 
 ### Plex Media Server
 
 **Image:** `lscr.io/linuxserver/plex:latest`  
 **Purpose:** Organize and stream TV, movies, and documentaries.
 
-| Item | Value |
-|------|--------|
-| Network | `host` |
-| Ports | **32400** (web/API; standard Plex port on host) |
-| Config | `${PRIMARY_PARTITION}/plex/library` → `/config` |
-| Libraries | `${SECONDARY_PARTITION}/plex_data/tv` → `/tv` |
-| | `${SECONDARY_PARTITION}/plex_data/movies` → `/movies` |
-| | `${SECONDARY_PARTITION}/plex_data/doc` → `/documentaries` |
+
+| Item      | Value                                                     |
+| --------- | --------------------------------------------------------- |
+| Network   | `host`                                                    |
+| Ports     | **32400** (web/API; standard Plex port on host)           |
+| Config    | `${PRIMARY_PARTITION}/plex/library` → `/config`           |
+| Libraries | `${SECONDARY_PARTITION}/plex_data/tv` → `/tv`             |
+|           | `${SECONDARY_PARTITION}/plex_data/movies` → `/movies`     |
+|           | `${SECONDARY_PARTITION}/plex_data/doc` → `/documentaries` |
+
 
 **Environment:** `PUID=1000`, `PGID=1000`, `VERSION=docker`, `PLEX_CLAIM` (from [plex.tv/claim](https://www.plex.tv/claim)), plus partition vars passed through.
 
@@ -94,39 +111,81 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Home Assistant
 
 **Image:** `homeassistant/home-assistant:latest`  
 **Purpose:** Smart home automation and device control.
 
-| Item | Value |
-|------|--------|
-| Network | `host` |
-| Ports | **8123** (default UI on host) |
-| Config | `${PRIMARY_PARTITION}/hass` → `/config` |
-| Serial | `/dev/serial/by-id/` mounted for USB adapters (Z-Wave, Zigbee, etc.) |
-| Device | `/dev/ttyACM0` |
+
+| Item    | Value                                                                |
+| ------- | -------------------------------------------------------------------- |
+| Network | `host`                                                               |
+| Ports   | **8123** (default UI on host)                                        |
+| Config  | `${PRIMARY_PARTITION}/hass` → `/config`                              |
+| Serial  | `/dev/serial/by-id/` mounted for USB adapters (Z-Wave, Zigbee, etc.) |
+| Device  | `/dev/ttyACM0`                                                       |
+
 
 **Environment:** `TZ=Europe/Athens`
 
 **Access:** `http://HOST:8123`
 
-**Notes:** Runs **privileged** for hardware access. Adjust `devices` if your USB serial path differs. Agent DVR has a [Home Assistant integration](https://www.ispyconnect.com/docs/agent/about).
+**Notes:** Runs **privileged** for hardware access. Adjust `devices` if your USB serial path differs. Agent DVR has a [Home Assistant integration](https://www.ispyconnect.com/docs/agent/about). For UPS sensors, add the [NUT integration](https://www.home-assistant.io/integrations/nut/) pointing at `127.0.0.1:3493` (see [NUT](#nut-network-ups-tools) below).
 
 ---
+
+
+
+### NUT (Network UPS Tools)
+
+**Image:** `ghcr.io/cplieger/docker-nut-upsd:latest`  
+**Purpose:** Monitor the nJoy Code 800 UPS (`UPLI-LI080CO-AZ01B`) over USB and expose status on the network for Home Assistant and other NUT clients.
+
+
+| Item    | Value                                      |
+| ------- | ------------------------------------------ |
+| Network | default bridge                             |
+| Ports   | **3493** → `3493` (NUT protocol)           |
+| USB     | `/dev/bus/usb` + cgroup rule `c 189:* rmw` |
+| Driver  | `nutdrv_qx` (ViewPower / Voltronic Q*)     |
+| UPS name| `njoy`                                     |
+
+
+**Environment:** `TZ=Europe/Bucharest`, `UPS_NAME=njoy`, `UPS_DESC=nJoy Code 800`, `UPS_DRIVER` / `API_USER` / `API_PASSWORD` from `.env` (`NUT_*`).
+
+**Access:** TCP `HOST:3493` — no web UI. Query from the container: `docker exec nut-upsd upsc njoy@127.0.0.1`.
+
+**Home Assistant:** Settings → Devices & services → Add integration → **Network UPS Tools (NUT)** → host `127.0.0.1` (HA uses host networking), port `3493`, username/password from `NUT_API_USER` / `NUT_API_PASSWORD`, UPS resource `njoy`.
+
+**Notes:**
+
+- Plug the UPS USB cable into the NAS before starting the service. First start of `nutdrv_qx` can take about a minute while it probes protocols.
+- `lsusb` often shows Cypress `0665:5161` for this class of UPS.
+- Set a strong `NUT_API_PASSWORD` in `.env` (12+ characters; avoid `"`, `\`, `#`) before `docker compose up -d nut-upsd`.
+- Default API user is read-only (status). Instant commands need the image’s `admin` account if required later.
+- If the driver fails, mount a custom `ups.conf.user` with detected `protocol` / `vendorid` / `productid` (see [docker-nut-upsd](https://github.com/cplieger/docker-nut-upsd)).
+- Battery runtime is short at high load (~5.5 min at 50% / ~1 s at 100%); size HA automations accordingly.
+
+---
+
+
 
 ### go2rtc
 
 **Image:** `alexxit/go2rtc`  
 **Purpose:** Camera ingest and restream (RTSP/WebRTC) for Home Assistant, Agent DVR, and browsers.
 
-| Item | Value |
-|------|--------|
-| Network | `host` |
-| Ports | **1984** (UI/API), **8554** (RTSP), **8555** (WebRTC) |
-| Config | [`go2rtc/go2rtc.yaml`](go2rtc/go2rtc.yaml) → `/config` |
 
-**Environment:** Loaded from `.env` (`GO2RTC_*`, camera `*_URL` vars). `TZ=Europe/Athens`.
+| Item    | Value                                                  |
+| ------- | ------------------------------------------------------ |
+| Network | `host`                                                 |
+| Ports   | **1984** (UI/API), **8554** (RTSP), **8555** (WebRTC)  |
+| Config  | `[go2rtc/go2rtc.yaml](go2rtc/go2rtc.yaml)` → `/config` |
+
+
+**Environment:** Loaded from `.env` (`GO2RTC_`*, camera `*_URL` vars). `TZ=Europe/Athens`.
 
 **Access:** `http://HOST:1984` — RTSP restreams at `rtsp://HOST:8554/<stream_name>` (e.g. `fata`, `spate`, `sopru`, `pod`, `terasa`).
 
@@ -134,20 +193,24 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Agent DVR
 
 **Image:** `ispysoftware/agentdvr:latest`  
 **Purpose:** NVR with live view, continuous/motion recording, optional AI; cameras via go2rtc or direct RTSP.
 
-| Item | Value |
-|------|--------|
-| Network | `my-network` (+ `host.docker.internal` → host gateway) |
-| Ports | **8090** (web UI), **3478/udp** (TURN), **50000–50100/udp** (WebRTC) |
-| Config | `${PRIMARY_PARTITION}/agentdvr/config` → `/AgentDVR/Media/XML` |
-| Media | `${PRIMARY_PARTITION}/agentdvr/media` → `/AgentDVR/Media/WebServerRoot/Media` |
-| Models | `${PRIMARY_PARTITION}/agentdvr/models` → `/AgentDVR/Media/Models` |
-| Commands | `${PRIMARY_PARTITION}/agentdvr/commands` → `/AgentDVR/Commands` |
-| Devices | `/dev/dri/renderD128` (Intel iGPU encode/decode) |
+
+| Item     | Value                                                                         |
+| -------- | ----------------------------------------------------------------------------- |
+| Network  | `my-network` (+ `host.docker.internal` → host gateway)                        |
+| Ports    | **8090** (web UI), **3478/udp** (TURN), **50000–50100/udp** (WebRTC)          |
+| Config   | `${PRIMARY_PARTITION}/agentdvr/config` → `/AgentDVR/Media/XML`                |
+| Media    | `${PRIMARY_PARTITION}/agentdvr/media` → `/AgentDVR/Media/WebServerRoot/Media` |
+| Models   | `${PRIMARY_PARTITION}/agentdvr/models` → `/AgentDVR/Media/Models`             |
+| Commands | `${PRIMARY_PARTITION}/agentdvr/commands` → `/AgentDVR/Commands`               |
+| Devices  | `/dev/dri/renderD128` (Intel iGPU encode/decode)                              |
+
 
 **Environment:** `PUID=1000`, `PGID=1000`, `TZ=Europe/Athens`, `AGENTDVR_WEBUI_PORT=8090`
 
@@ -162,18 +225,22 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### qBittorrent
 
 **Image:** `lscr.io/linuxserver/qbittorrent:latest`  
 **Purpose:** BitTorrent client with web UI; downloads feed Plex libraries and *arr apps.
 
-| Item | Value |
-|------|--------|
-| Network | `my-network` |
-| Ports | **8080** (web UI), **6881/tcp** and **6881/udp** (BitTorrent) |
-| Config | `${PRIMARY_PARTITION}/qbt` → `/config` |
-| Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads` |
-| Media | Same TV/movies/doc paths as Plex (`/tv`, `/movies`, `/doc`) |
+
+| Item      | Value                                                         |
+| --------- | ------------------------------------------------------------- |
+| Network   | `my-network`                                                  |
+| Ports     | **8080** (web UI), **6881/tcp** and **6881/udp** (BitTorrent) |
+| Config    | `${PRIMARY_PARTITION}/qbt` → `/config`                        |
+| Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads`             |
+| Media     | Same TV/movies/doc paths as Plex (`/tv`, `/movies`, `/doc`)   |
+
 
 **Environment:** `PUID=1000`, `PGID=1000`, `TZ=Europe/Athens`, `WEBUI_PORT=8080`
 
@@ -181,17 +248,21 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Nginx Proxy Manager
 
 **Image:** `jc21/nginx-proxy-manager:latest`  
 **Purpose:** Reverse proxy, host-based routing, and Let’s Encrypt SSL from a web UI.
 
-| Item | Value |
-|------|--------|
-| Network | `host` |
-| Ports | **80** (HTTP), **443** (HTTPS), **81** (admin UI) |
-| Data | `${PRIMARY_PARTITION}/nginx/data` → `/data` |
+
+| Item         | Value                                                         |
+| ------------ | ------------------------------------------------------------- |
+| Network      | `host`                                                        |
+| Ports        | **80** (HTTP), **443** (HTTPS), **81** (admin UI)             |
+| Data         | `${PRIMARY_PARTITION}/nginx/data` → `/data`                   |
 | Certificates | `${PRIMARY_PARTITION}/nginx/letsencrypt` → `/etc/letsencrypt` |
+
 
 **Access:** `http://HOST:81` — default login `admin@example.com` / `changeme` (change immediately).
 
@@ -199,18 +270,22 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### OpenVPN
 
 **Image:** `kylemanna/openvpn`  
 **Purpose:** Remote access to the home network.
 
-| Item | Value |
-|------|--------|
-| Network | `my-network` |
-| Ports | **1194/udp** |
-| Volume | Named volume `ovpn-data-nas` (external) → `/etc/openvpn` |
-| Capabilities | `NET_ADMIN` |
-| Device | `/dev/net/tun` |
+
+| Item         | Value                                                    |
+| ------------ | -------------------------------------------------------- |
+| Network      | `my-network`                                             |
+| Ports        | **1194/udp**                                             |
+| Volume       | Named volume `ovpn-data-nas` (external) → `/etc/openvpn` |
+| Capabilities | `NET_ADMIN`                                              |
+| Device       | `/dev/net/tun`                                           |
+
 
 **Environment:** `OVPN_DATA` references `${PRIMARY_PARTITION}/openvpn` for setup scripts; runtime config uses the Docker volume `ovpn-data-nas`.
 
@@ -218,17 +293,21 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Duplicati
 
 **Image:** `lscr.io/linuxserver/duplicati:latest`  
 **Purpose:** Encrypted incremental backups to cloud or remote targets.
 
-| Item | Value |
-|------|--------|
-| Network | default bridge |
-| Ports | **8200** → `8200` |
-| Config | `${PRIMARY_PARTITION}/duplicati/config` → `/config` |
+
+| Item          | Value                                                                       |
+| ------------- | --------------------------------------------------------------------------- |
+| Network       | default bridge                                                              |
+| Ports         | **8200** → `8200`                                                           |
+| Config        | `${PRIMARY_PARTITION}/duplicati/config` → `/config`                         |
 | Backup source | `${PRIMARY_PARTITION}` → `/source` (entire primary partition visible in UI) |
+
 
 **Environment:** `PUID=1000`, `PGID=1000`, `TZ=Etc/UTC`, `SETTINGS_ENCRYPTION_KEY`, `DUPLICATI__WEBSERVICE_PASSWORD`
 
@@ -238,18 +317,22 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Radarr
 
 **Image:** `lscr.io/linuxserver/radarr:latest`  
 **Purpose:** Movie collection manager; integrates with download clients and Plex.
 
-| Item | Value |
-|------|--------|
-| Network | default bridge |
-| Ports | **7878** → `7878` |
-| Config | `${PRIMARY_PARTITION}/radarr/data` → `/config` |
-| Movies | `${SECONDARY_PARTITION}/plex_data/movies` → `/movies` |
-| Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads` |
+
+| Item      | Value                                                 |
+| --------- | ----------------------------------------------------- |
+| Network   | default bridge                                        |
+| Ports     | **7878** → `7878`                                     |
+| Config    | `${PRIMARY_PARTITION}/radarr/data` → `/config`        |
+| Movies    | `${SECONDARY_PARTITION}/plex_data/movies` → `/movies` |
+| Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads`     |
+
 
 **Environment:** `PUID=1000`, `PGID=1000`, `TZ=Etc/UTC`
 
@@ -259,18 +342,22 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Sonarr
 
 **Image:** `lscr.io/linuxserver/sonarr:latest`  
 **Purpose:** TV series manager; same workflow as Radarr for shows.
 
-| Item | Value |
-|------|--------|
-| Network | default bridge |
-| Ports | **8989** → `8989` |
-| Config | `${PRIMARY_PARTITION}/sonarr/data` → `/config` |
-| TV | `${SECONDARY_PARTITION}/plex_data/tv` → `/tv` |
+
+| Item      | Value                                             |
+| --------- | ------------------------------------------------- |
+| Network   | default bridge                                    |
+| Ports     | **8989** → `8989`                                 |
+| Config    | `${PRIMARY_PARTITION}/sonarr/data` → `/config`    |
+| TV        | `${SECONDARY_PARTITION}/plex_data/tv` → `/tv`     |
 | Downloads | `${SECONDARY_PARTITION}/downloads` → `/downloads` |
+
 
 **Environment:** `PUID=1000`, `PGID=1000`, `TZ=Etc/UTC`
 
@@ -280,16 +367,20 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Seerr
 
 **Image:** `ghcr.io/seerr-team/seerr:latest`  
 **Purpose:** Request and discover movies/TV (Overseerr successor); talks to Plex, Radarr, and Sonarr.
 
-| Item | Value |
-|------|--------|
-| Network | default bridge |
-| Ports | **5055** → `5055` |
-| Config | `${PRIMARY_PARTITION}/seer` → `/app/config` |
+
+| Item    | Value                                       |
+| ------- | ------------------------------------------- |
+| Network | default bridge                              |
+| Ports   | **5055** → `5055`                           |
+| Config  | `${PRIMARY_PARTITION}/seer` → `/app/config` |
+
 
 **Environment:** `LOG_LEVEL=debug`, `TZ=Asia/Tashkent`, `PORT=5055`
 
@@ -301,16 +392,20 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Prowlarr
 
 **Image:** `lscr.io/linuxserver/prowlarr:latest`  
 **Purpose:** Indexer manager for Radarr/Sonarr (and other *arr apps).
 
-| Item | Value |
-|------|--------|
-| Network | default bridge |
-| Ports | **9696** → `9696` |
-| Config | `${PRIMARY_PARTITION}/prowlarr` → `/config` |
+
+| Item    | Value                                       |
+| ------- | ------------------------------------------- |
+| Network | default bridge                              |
+| Ports   | **9696** → `9696`                           |
+| Config  | `${PRIMARY_PARTITION}/prowlarr` → `/config` |
+
 
 **Environment:** `PUID=1000`, `PGID=1000`, `TZ=Europe/Bucharest`
 
@@ -320,20 +415,24 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ### Immich
 
 **Images:** `immich-server`, `immich-machine-learning` (OpenVINO variant), Valkey `redis`, Immich Postgres `database`  
 **Purpose:** Self-hosted photo and video backup with ML features (faces, search).
 
-| Item | Value |
-|------|--------|
-| Network | default project bridge |
-| Ports | **2283** (server UI/API) |
-| Upload data | `${PRIMARY_PARTITION}/${IMMICH_UPLOAD_LOCATION}` → `/data` |
-| Postgres | `${PRIMARY_PARTITION}/${IMMICH_DB_DATA_LOCATION}` → `/var/lib/postgresql/data` |
-| Devices | `/dev/dri` on server and ML containers |
 
-**Environment:** See Immich block in [`.env.example`](.env.example) (`IMMICH_*`). ML image tag uses `IMMICH_ML_HWACCEL` (default `openvino`).
+| Item        | Value                                                                          |
+| ----------- | ------------------------------------------------------------------------------ |
+| Network     | default project bridge                                                         |
+| Ports       | **2283** (server UI/API)                                                       |
+| Upload data | `${PRIMARY_PARTITION}/${IMMICH_UPLOAD_LOCATION}` → `/data`                     |
+| Postgres    | `${PRIMARY_PARTITION}/${IMMICH_DB_DATA_LOCATION}` → `/var/lib/postgresql/data` |
+| Devices     | `/dev/dri` on server and ML containers                                         |
+
+
+**Environment:** See Immich block in `[.env.example](.env.example)` (`IMMICH_`*). ML image tag uses `IMMICH_ML_HWACCEL` (default `openvino`).
 
 **Access:** `http://HOST:2283`
 
@@ -341,53 +440,79 @@ Replace `HOST` with your server IP or hostname.
 
 ---
 
+
+
 ## Configuration
+
+
 
 ### Environment variables
 
-Copy [`.env.example`](.env.example) to `.env` and fill in values. Variables are grouped by service in the example file.
+Copy `[.env.example](.env.example)` to `.env` and fill in values. Variables are grouped by service in the example file.
 
 **Shared**
 
-| Variable | Purpose |
-|----------|---------|
-| `COMPOSE_PROJECT_NAME` | Docker Compose project name (default `nas`) |
-| `PRIMARY_PARTITION` | Config, DBs, app data |
-| `SECONDARY_PARTITION` | Media libraries and downloads |
-| `DOMAIN` | Optional (OpenVPN client generation, public hostnames) |
+
+| Variable               | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `COMPOSE_PROJECT_NAME` | Docker Compose project name (default `nas`)            |
+| `PRIMARY_PARTITION`    | Config, DBs, app data                                  |
+| `SECONDARY_PARTITION`  | Media libraries and downloads                          |
+| `DOMAIN`               | Optional (OpenVPN client generation, public hostnames) |
+
 
 **Plex**
 
-| Variable | Purpose |
-|----------|---------|
+
+| Variable     | Purpose                 |
+| ------------ | ----------------------- |
 | `PLEX_CLAIM` | First-time server claim |
+
 
 **go2rtc**
 
-| Variable | Purpose |
-|----------|---------|
-| `GO2RTC_API_USERNAME` / `GO2RTC_API_PASSWORD` | Web UI / API auth |
-| `GO2RTC_RTSP_USERNAME` / `GO2RTC_RTSP_PASSWORD` | RTSP restream auth (Agent DVR / HA / other clients) |
-| `FATA_URL`, `SPATE_URL`, `SOPRU_URL`, `POD_URL`, `TERASA_URL` | Camera RTSP source URLs |
+
+| Variable                                                      | Purpose                                             |
+| ------------------------------------------------------------- | --------------------------------------------------- |
+| `GO2RTC_API_USERNAME` / `GO2RTC_API_PASSWORD`                 | Web UI / API auth                                   |
+| `GO2RTC_RTSP_USERNAME` / `GO2RTC_RTSP_PASSWORD`               | RTSP restream auth (Agent DVR / HA / other clients) |
+| `FATA_URL`, `SPATE_URL`, `SOPRU_URL`, `POD_URL`, `TERASA_URL` | Camera RTSP source URLs                             |
+
 
 **Duplicati**
 
-| Variable | Purpose |
-|----------|---------|
-| `DUPLICATI_PASSWORD` | Web UI (`DUPLICATI__WEBSERVICE_PASSWORD`) |
-| `SETTINGS_ENCRYPTION_KEY` | Settings encryption |
+
+| Variable                  | Purpose                                   |
+| ------------------------- | ----------------------------------------- |
+| `DUPLICATI_PASSWORD`      | Web UI (`DUPLICATI__WEBSERVICE_PASSWORD`) |
+| `SETTINGS_ENCRYPTION_KEY` | Settings encryption                       |
+
 
 **Immich**
 
-| Variable | Purpose |
-|----------|---------|
-| `IMMICH_VERSION` | Image tag (default `release`) |
-| `IMMICH_UPLOAD_LOCATION` | Upload path under primary partition |
-| `IMMICH_DB_DATA_LOCATION` | Postgres data path under primary partition |
-| `IMMICH_TZ` | Timezone |
-| `IMMICH_DB_PASSWORD` / `IMMICH_DB_USERNAME` / `IMMICH_DB_DATABASE_NAME` | Postgres credentials |
-| `IMMICH_DB_STORAGE_TYPE` | e.g. `HDD` |
-| `IMMICH_ML_HWACCEL` | ML image suffix (default `openvino`) |
+
+| Variable                                                                | Purpose                                    |
+| ----------------------------------------------------------------------- | ------------------------------------------ |
+| `IMMICH_VERSION`                                                        | Image tag (default `release`)              |
+| `IMMICH_UPLOAD_LOCATION`                                                | Upload path under primary partition        |
+| `IMMICH_DB_DATA_LOCATION`                                               | Postgres data path under primary partition |
+| `IMMICH_TZ`                                                             | Timezone                                   |
+| `IMMICH_DB_PASSWORD` / `IMMICH_DB_USERNAME` / `IMMICH_DB_DATABASE_NAME` | Postgres credentials                       |
+| `IMMICH_DB_STORAGE_TYPE`                                                | e.g. `HDD`                                 |
+| `IMMICH_ML_HWACCEL`                                                     | ML image suffix (default `openvino`)       |
+
+
+**NUT (nJoy Code 800)**
+
+
+| Variable           | Purpose                                                                 |
+| ------------------ | ----------------------------------------------------------------------- |
+| `NUT_UPS_DRIVER`   | NUT driver (default `nutdrv_qx` for ViewPower USB)                      |
+| `NUT_API_USER`     | NUT client username (default `monuser`)                                 |
+| `NUT_API_PASSWORD` | NUT client password (required; 12+ chars; avoid `"`, `\`, `#`)          |
+
+
+
 
 ### External Docker volume (OpenVPN)
 
@@ -396,6 +521,8 @@ Create before first `docker compose up` if not present:
 ```bash
 docker volume create ovpn-data-nas
 ```
+
+
 
 ### Volume layout
 
@@ -428,7 +555,11 @@ ${SECONDARY_PARTITION}/
 
 ---
 
+
+
 ## Installation
+
+
 
 ### Prerequisites
 
@@ -438,47 +569,40 @@ ${SECONDARY_PARTITION}/
 - For OpenVPN: kernel TUN (`/dev/net/tun`) and external volume `ovpn-data-nas`
 - For Agent DVR / Immich ML on Intel: `/dev/dri` available on the host
 
+
+
 ### Steps
 
 1. Clone the repo and enter the directory.
-
 2. Create `.env` from the example and set paths and secrets:
-
-   ```bash
+  ```bash
    cp .env.example .env
    nano .env
-   ```
-
+  ```
 3. Create data directories (adjust paths to match `.env`):
-
-   ```bash
+  ```bash
    mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,agentdvr/{config,media,models,commands},qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
    mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc},downloads}
-   ```
-
+  ```
 4. Set ownership for LinuxServer containers (if needed):
-
-   ```bash
+  ```bash
    sudo chown -R 1000:1000 "${PRIMARY_PARTITION}" "${SECONDARY_PARTITION}"
-   ```
-
+  ```
 5. Create OpenVPN volume and start the stack:
-
-   ```bash
+  ```bash
    docker volume create ovpn-data-nas
    docker compose up -d
-   ```
-
+  ```
 6. Verify:
-
-   ```bash
+  ```bash
    docker compose ps
    docker compose logs -f SERVICE_NAME
-   ```
-
+  ```
 7. Agent DVR: open `http://HOST:8090`, add cameras from go2rtc (`rtsp://…@host.docker.internal:8554/<name>`).
 
 ---
+
+
 
 ## OpenVPN setup
 
@@ -497,6 +621,8 @@ docker run -v ovpn-data-nas:/etc/openvpn --rm kylemanna/openvpn ovpn_getclient "
 Ensure the `openvpn` service is running and UDP **1194** is forwarded on your router if clients connect from the internet.
 
 ---
+
+
 
 ## Maintenance
 
@@ -526,6 +652,8 @@ docker compose up -d --force-recreate SERVICE_NAME
 
 ---
 
+
+
 ## Security
 
 1. Change default passwords (qBittorrent, Nginx Proxy Manager, Duplicati, Agent DVR).
@@ -534,23 +662,32 @@ docker compose up -d --force-recreate SERVICE_NAME
 4. Keep images updated (`docker compose pull`).
 5. OpenVPN: use strong PKI; protect `.ovpn` files.
 6. Protect go2rtc API/RTSP credentials; camera URLs in `.env` contain secrets — do not commit `.env`.
+7. Keep NUT (`3493`) on the LAN only; set a strong `NUT_API_PASSWORD` and do not expose the port publicly.
 
 ---
+
+
 
 ## Troubleshooting
 
-| Issue | Things to check |
-|-------|------------------|
-| Permission denied on volumes | `PUID`/`PGID` 1000; `chown` on mount paths |
-| Port already in use | `ss -tulpn \| grep PORT` on the host (go2rtc uses 1984/8554/8555) |
-| *arr / Seerr cannot reach qBittorrent | Use host IP and port **8080**, not container name (different networks) |
-| Plex not visible | Claim with fresh `PLEX_CLAIM`; host networking and firewall on **32400** |
-| OpenVPN fails to start | `ovpn-data-nas` exists; `/dev/net/tun`; `NET_ADMIN` |
-| Agent DVR cameras offline | go2rtc up; `GO2RTC_RTSP_*` set; use `host.docker.internal:8554/<stream>` |
-| Agent DVR / Immich GPU errors | `/dev/dri/renderD128` present; try without `card0` if missing |
-| Immich won't start | `IMMICH_DB_PASSWORD` set; Postgres path writable |
+
+| Issue                                 | Things to check                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| Permission denied on volumes          | `PUID`/`PGID` 1000; `chown` on mount paths                               |
+| Port already in use                   | `ss -tulpn | grep PORT` on the host (go2rtc uses 1984/8554/8555)         |
+| *arr / Seerr cannot reach qBittorrent | Use host IP and port **8080**, not container name (different networks)   |
+| Plex not visible                      | Claim with fresh `PLEX_CLAIM`; host networking and firewall on **32400** |
+| OpenVPN fails to start                | `ovpn-data-nas` exists; `/dev/net/tun`; `NET_ADMIN`                      |
+| Agent DVR cameras offline             | go2rtc up; `GO2RTC_RTSP_*` set; use `host.docker.internal:8554/<stream>` |
+| Agent DVR / Immich GPU errors         | `/dev/dri/renderD128` present; try without `card0` if missing            |
+| Immich won't start                    | `IMMICH_DB_PASSWORD` set; Postgres path writable                         |
+| NUT / UPS not detected                | USB plugged in; `lsusb` (often `0665:5161`); `NUT_API_PASSWORD` set; wait ~1 min for `nutdrv_qx` probe; check `docker compose logs nut-upsd` |
+| HA cannot add NUT                     | `nut-upsd` healthy; host `127.0.0.1` port **3493**; UPS name `njoy`; matching `NUT_API_*` credentials |
+
 
 ---
+
+
 
 ## License
 

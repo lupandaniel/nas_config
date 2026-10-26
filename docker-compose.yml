@@ -39,6 +39,31 @@ services:
     network_mode: host
     restart: always
 
+  # NUT server for nJoy Code 800 (UPLI-LI080CO-AZ01B). USB + ViewPower → nutdrv_qx.
+  # Clients (e.g. Home Assistant NUT integration): HOST:3493, UPS name njoy.
+  nut-upsd:
+    image: ghcr.io/cplieger/docker-nut-upsd:latest
+    container_name: nut-upsd
+    restart: unless-stopped
+    user: "0:0"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=Europe/Bucharest
+      - UPS_NAME=njoy
+      - UPS_DESC=nJoy Code 800
+      - UPS_DRIVER=${NUT_UPS_DRIVER:-nutdrv_qx}
+      - UPS_PORT=auto
+      - API_USER=${NUT_API_USER:-monuser}
+      - API_PASSWORD=${NUT_API_PASSWORD}
+      - COMMS_WATCHDOG=true
+    ports:
+      - "3493:3493"
+    device_cgroup_rules:
+      - "c 189:* rmw"
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+
   go2rtc:
     image: alexxit/go2rtc
     container_name: go2rtc
