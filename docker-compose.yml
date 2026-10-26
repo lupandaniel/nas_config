@@ -64,6 +64,25 @@ services:
     volumes:
       - /dev/bus/usb:/dev/bus/usb
 
+  # PeaNUT: web UI for nut-upsd. Open http://HOST:8282 — add server host nut-upsd:3493
+  # (same NUT_API_USER / NUT_API_PASSWORD). Port 8282 avoids clash with qBittorrent :8080.
+  peanut:
+    image: brandawg93/peanut:latest
+    container_name: peanut
+    restart: unless-stopped
+    depends_on:
+      - nut-upsd
+    environment:
+      - TZ=Europe/Bucharest
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=8282
+      - WEB_USERNAME=${PEANUT_WEB_USERNAME:-admin}
+      - WEB_PASSWORD=${PEANUT_WEB_PASSWORD}
+    volumes:
+      - ${PRIMARY_PARTITION}/peanut:/config
+    ports:
+      - "8282:8282"
+
   go2rtc:
     image: alexxit/go2rtc
     container_name: go2rtc

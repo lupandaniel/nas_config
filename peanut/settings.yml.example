@@ -1,0 +1,8 @@
+# Copy to ${PRIMARY_PARTITION}/peanut/settings.yml on the NAS (chown 1000:1000),
+# or add the same server in the PeaNUT UI (Manage Servers).
+# HOST must be the compose service name so PeaNUT reaches nut-upsd on the Docker network.
+NUT_SERVERS:
+  - HOST: nut-upsd
+    PORT: 3493
+    USERNAME: monuser
+    PASSWORD: change-me-to-NUT_API_PASSWORD

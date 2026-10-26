@@ -20,6 +20,7 @@ Replace `HOST` with your server IP or hostname.
 | Plex                | 32443       | TCP      | host                      | HTTPS (if enabled in Plex) |
 | Home Assistant      | 8123        | TCP      | host                      | Web UI                     |
 | NUT (nut-upsd)      | 3493        | TCP      | `3493:3493`               | UPS status (nJoy Code 800) |
+| PeaNUT              | 8282        | TCP      | `8282:8282`               | NUT web UI                 |
 | go2rtc              | 1984        | TCP      | host                      | Web UI / API               |
 | go2rtc              | 8554        | TCP      | host                      | RTSP restream              |
 | go2rtc              | 8555        | TCP/UDP  | host                      | WebRTC                     |
@@ -51,6 +52,7 @@ Replace `HOST` with your server IP or hostname.
 | Plex                | `http://HOST:32400/web`               |
 | Home Assistant      | `http://HOST:8123`                    |
 | NUT                 | TCP `HOST:3493` (UPS name `njoy`)     |
+| PeaNUT              | `http://HOST:8282`                    |
 | go2rtc              | `http://HOST:1984`                    |
 | Agent DVR           | `http://HOST:8090`                    |
 | Nginx Proxy Manager | `http://HOST:81`                      |
@@ -74,10 +76,10 @@ Replace `HOST` with your server IP or hostname.
 - **Networks**:
   - `host`: Plex, Home Assistant, go2rtc, Agent DVR, Nginx Proxy Manager — use the host’s ports directly.
   - `my-network`: qBittorrent, OpenVPN — can resolve each other by container name.
-  - **Default project bridge**: NUT, Duplicati, Radarr, Sonarr, Seerr, Prowlarr, Immich (+ Valkey/Postgres) — published ports only; not on `my-network`.
+  - **Default project bridge**: NUT, PeaNUT, Duplicati, Radarr, Sonarr, Seerr, Prowlarr, Immich (+ Valkey/Postgres) — published ports only; not on `my-network`.
 - **Cameras**: go2rtc owns camera connections and restreams on **8554** / **8555**. Agent DVR should ingest those restreams (or camera URLs directly).
-- **UPS**: `nut-upsd` talks to the nJoy Code 800 over USB (`nutdrv_qx`) and serves NUT on **3493** for Home Assistant and other clients.
-- **Restart**: Most services use `restart: always`; Agent DVR, NUT, Duplicati, Radarr, Sonarr, Seerr, and Prowlarr use `restart: unless-stopped`.
+- **UPS**: `nut-upsd` talks to the nJoy Code 800 over USB (`nutdrv_qx`) and serves NUT on **3493**; **PeaNUT** is the web UI on **8282**.
+- **Restart**: Most services use `restart: always`; Agent DVR, NUT, PeaNUT, Duplicati, Radarr, Sonarr, Seerr, and Prowlarr use `restart: unless-stopped`.
 
 ---
 
@@ -155,7 +157,7 @@ Replace `HOST` with your server IP or hostname.
 
 **Environment:** `TZ=Europe/Bucharest`, `UPS_NAME=njoy`, `UPS_DESC=nJoy Code 800`, `UPS_DRIVER` / `API_USER` / `API_PASSWORD` from `.env` (`NUT_*`).
 
-**Access:** TCP `HOST:3493` — no web UI. Query from the container: `docker exec nut-upsd upsc njoy@127.0.0.1`.
+**Access:** TCP `HOST:3493`. CLI: `docker exec nut-upsd upsc njoy@127.0.0.1`. Web UI: [PeaNUT](#peanut) at `http://HOST:8282`.
 
 **Home Assistant:** Settings → Devices & services → Add integration → **Network UPS Tools (NUT)** → host `127.0.0.1` (HA uses host networking), port `3493`, username/password from `NUT_API_USER` / `NUT_API_PASSWORD`, UPS resource `njoy`.
 
@@ -167,6 +169,35 @@ Replace `HOST` with your server IP or hostname.
 - Default API user is read-only (status). Instant commands need the image’s `admin` account if required later.
 - If the driver fails, mount a custom `ups.conf.user` with detected `protocol` / `vendorid` / `productid` (see [docker-nut-upsd](https://github.com/cplieger/docker-nut-upsd)).
 - Battery runtime is short at high load (~5.5 min at 50% / ~1 s at 100%); size HA automations accordingly.
+
+---
+
+
+
+### PeaNUT
+
+**Image:** `brandawg93/peanut:latest`  
+**Purpose:** Web dashboard for Network UPS Tools (talks to `nut-upsd`).
+
+
+| Item   | Value                                              |
+| ------ | -------------------------------------------------- |
+| Network| default project bridge (reaches `nut-upsd` by name)|
+| Ports  | **8282** → `8282`                                  |
+| Config | `${PRIMARY_PARTITION}/peanut` → `/config`          |
+
+
+**Environment:** `WEB_HOST=0.0.0.0`, `WEB_PORT=8282`, `WEB_USERNAME` / `WEB_PASSWORD` from `PEANUT_WEB_*` in `.env`.
+
+**Access:** `http://HOST:8282`
+
+**Setup:**
+
+1. `mkdir -p "${PRIMARY_PARTITION}/peanut" && sudo chown -R 1000:1000 "${PRIMARY_PARTITION}/peanut"`
+2. Set `PEANUT_WEB_PASSWORD` (and `NUT_API_PASSWORD`) in `.env`, then `docker compose up -d peanut`
+3. In PeaNUT → Manage Servers → add host **`nut-upsd`**, port **3493**, username/password = `NUT_API_USER` / `NUT_API_PASSWORD`. Or copy [`peanut/settings.yml.example`](peanut/settings.yml.example) to `${PRIMARY_PARTITION}/peanut/settings.yml` and set the password.
+
+**Notes:** Runs as UID/GID 1000 (no `PUID`/`PGID`). Port **8282** avoids conflict with qBittorrent on **8080**.
 
 ---
 
@@ -512,6 +543,15 @@ Copy `[.env.example](.env.example)` to `.env` and fill in values. Variables are 
 | `NUT_API_PASSWORD` | NUT client password (required; 12+ chars; avoid `"`, `\`, `#`)          |
 
 
+**PeaNUT**
+
+
+| Variable              | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `PEANUT_WEB_USERNAME` | PeaNUT login (default `admin`)               |
+| `PEANUT_WEB_PASSWORD` | PeaNUT login password (set before first run) |
+
+
 
 
 ### External Docker volume (OpenVPN)
@@ -540,6 +580,7 @@ ${PRIMARY_PARTITION}/
 ├── sonarr/data/
 ├── seer/                    # Seerr config (compose path name)
 ├── prowlarr/
+├── peanut/                  # PeaNUT UI config (chown 1000:1000)
 ├── immich/library/          # IMMICH_UPLOAD_LOCATION
 ├── immich/postgres/         # IMMICH_DB_DATA_LOCATION
 └── openvpn/                 # used by OVPN setup scripts (OVPN_DATA)
@@ -581,7 +622,7 @@ ${SECONDARY_PARTITION}/
   ```
 3. Create data directories (adjust paths to match `.env`):
   ```bash
-   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,agentdvr/{config,media,models,commands},qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,immich/{library,postgres}}
+   mkdir -p "${PRIMARY_PARTITION}"/{plex/library,hass,agentdvr/{config,media,models,commands},qbt,nginx/{data,letsencrypt},duplicati/config,radarr/data,sonarr/data,seer,prowlarr,peanut,immich/{library,postgres}}
    mkdir -p "${SECONDARY_PARTITION}"/{plex_data/{tv,movies,doc},downloads}
   ```
 4. Set ownership for LinuxServer containers (if needed):
@@ -662,7 +703,7 @@ docker compose up -d --force-recreate SERVICE_NAME
 4. Keep images updated (`docker compose pull`).
 5. OpenVPN: use strong PKI; protect `.ovpn` files.
 6. Protect go2rtc API/RTSP credentials; camera URLs in `.env` contain secrets — do not commit `.env`.
-7. Keep NUT (`3493`) on the LAN only; set a strong `NUT_API_PASSWORD` and do not expose the port publicly.
+7. Keep NUT (`3493`) and PeaNUT (`8282`) on the LAN only; set strong `NUT_API_PASSWORD` / `PEANUT_WEB_PASSWORD` and do not expose them publicly.
 
 ---
 
@@ -683,6 +724,7 @@ docker compose up -d --force-recreate SERVICE_NAME
 | Immich won't start                    | `IMMICH_DB_PASSWORD` set; Postgres path writable                         |
 | NUT / UPS not detected                | USB plugged in; `lsusb` (often `0665:5161`); `NUT_API_PASSWORD` set; wait ~1 min for `nutdrv_qx` probe; check `docker compose logs nut-upsd` |
 | HA cannot add NUT                     | `nut-upsd` healthy; host `127.0.0.1` port **3493**; UPS name `njoy`; matching `NUT_API_*` credentials |
+| PeaNUT empty / no UPS                 | Add server `nut-upsd:3493` with `NUT_API_*`; config dir writable by UID 1000; `PEANUT_WEB_PASSWORD` set |
 
 
 ---
